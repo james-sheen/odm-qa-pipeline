@@ -99,7 +99,8 @@ jobs:
           BMC_PASS: ${{ secrets.bmc-password }}
         run: |
           set -uo pipefail
-          python3 -m pip install --quiet $(odm-qa-pipeline pins --gate dmtf)
+          odm-qa-pipeline pins --gate dmtf > requirements-dmtf.txt
+          python3 -m pip install --quiet -r requirements-dmtf.txt
           mkdir -p qa-artifacts/dmtf
           set +e
           rf_service_validator --ip "${TARGET}" -u "${BMC_USER}" -p "${BMC_PASS}" \
@@ -136,7 +137,8 @@ jobs:
           BMC_PASS: ${{ secrets.bmc-password }}
         run: |
           set -uo pipefail
-          python3 -m pip install --quiet $(odm-qa-pipeline pins --gate coverage)
+          odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
+          python3 -m pip install --quiet -r requirements-coverage.txt
           mkdir -p qa-artifacts
           set +e
           bmc-sensor-audit detect --config "${CONFIG}" --target "${TARGET}" \
@@ -162,7 +164,8 @@ jobs:
           SCENARIOS: ${{ inputs.scenarios }}
         run: |
           set -uo pipefail
-          python3 -m pip install --quiet $(odm-qa-pipeline pins --gate injection)
+          odm-qa-pipeline pins --gate injection > requirements-injection.txt
+          python3 -m pip install --quiet -r requirements-injection.txt
           set +e
           qa-orchestrator check "${SCENARIOS}"
           parse_rc=$?
@@ -190,7 +193,8 @@ jobs:
             echo "  no identity supplied; declare 'certificate' optional if that is deliberate"
             exit 0
           fi
-          python3 -m pip install --quiet $(odm-qa-pipeline pins --gate certificate)
+          odm-qa-pipeline pins --gate certificate > requirements-certificate.txt
+          python3 -m pip install --quiet -r requirements-certificate.txt
           set +e
           cert-generator render \
               --attestation qa-artifacts/attestation.json \

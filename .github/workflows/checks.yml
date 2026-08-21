@@ -74,9 +74,9 @@ jobs:
           python3 -m pip install --quiet -e '.[dev]'
           for gate in $(odm-qa-pipeline gates --json | python3 -c \
                         'import json,sys; print(" ".join(g["name"] for g in json.load(sys.stdin)))'); do
-            requirements=$(odm-qa-pipeline pins --gate "${gate}")
-            echo "  ${gate}: ${requirements}"
-            python3 -m pip install --quiet ${requirements}
+            odm-qa-pipeline pins --gate "${gate}" > "requirements-${gate}.txt"
+            sed 's/^/    /' "requirements-${gate}.txt"
+            python3 -m pip install --quiet -r "requirements-${gate}.txt"
           done
 
       - name: The orchestrator's scenarios, from its repository

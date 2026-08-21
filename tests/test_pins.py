@@ -139,6 +139,53 @@ class TestNoDefinitionRepeatsAConstraint:
             + "; ".join(offences))
 
 
+class TestPinsOutputIsConsumedAsARequirementsFile:
+    """A requirement can contain spaces, so it cannot be word-split.
+
+    `qa-orchestrator @ git+https://...` is the PEP 508 direct-reference form and
+    it has two spaces in it. Fed to pip as `$(odm-qa-pipeline pins --gate
+    injection)` the shell splits it into three arguments and pip stops on the bare
+    `@` -- *Invalid requirement: '@'*.
+
+    Every shipped definition therefore writes the output to a file and installs
+    with `-r`, which is the only form that survives whitespace. CI found this;
+    nothing in the suite did, because every test consumed the manifest through
+    Python and never through a shell.
+    """
+
+    def test_a_requirement_with_whitespace_actually_exists(self):
+        """Non-vacuity. If every requirement became a bare name the rule below
+        would still pass while protecting nothing, so pin the premise."""
+        spaced = [name for name, entry in pins.load()["components"].items()
+                  if " " in entry["requirement"]]
+        assert spaced, ("no requirement contains whitespace any more; if that is "
+                        "deliberate, this rule and its guard can go")
+
+    @pytest.mark.parametrize("path", shipped_definitions(),
+                             ids=lambda p: p.name)
+    def test_no_definition_word_splits_the_manifest(self, path):
+        offences = []
+        for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1):
+            if line.lstrip().startswith(("#", "//")):
+                continue
+            if "pip install" in line and "$(odm-qa-pipeline pins" in line:
+                offences.append(f"line {number}: {line.strip()}")
+        assert not offences, (
+            f"{path.relative_to(ROOT)} word-splits the manifest into pip; write "
+            f"it to a file and install with -r, because a direct reference "
+            f"contains spaces: " + "; ".join(offences))
+
+    def test_every_gate_produces_something_pip_could_read(self):
+        """One requirement per line, nothing else -- no headers, no blanks."""
+        for gate in names():
+            lines = pins.requirements_for(gate)
+            assert lines, gate
+            for line in lines:
+                assert line.strip() == line
+                assert "\n" not in line
+
+
 class TestLookups:
     def test_one_component(self):
         assert pins.requirement("bmc-sensor-audit").startswith("bmc-sensor-audit")

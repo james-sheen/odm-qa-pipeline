@@ -77,6 +77,20 @@ this repository's own CI rather than trusted as prose:
   copy of one fact, and the two would disagree the first time either moved —
   silently, because both files look authoritative. `tests/test_pins.py` fails if a
   requirement specifier appears in any shipped definition.
+
+  Its output is a **requirements file**, one per line, and must be consumed as
+  one:
+
+  ```
+  odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
+  pip install -r requirements-coverage.txt
+  ```
+
+  Not `pip install $(odm-qa-pipeline pins --gate coverage)`. A direct reference
+  such as `qa-orchestrator @ git+https://…` contains spaces; the shell splits it
+  into three arguments and pip stops on the bare `@`. That is a real defect this
+  repository shipped and CI caught — nothing in the suite saw it, because every
+  test read the manifest through Python and never through a shell.
 - **Every gate records a result, including the ones that fail**, and the
   aggregation runs under `if: always()` / `post { always }`. Skipping the summary
   when a gate fails would mean the aggregate verdict existed only for runs that

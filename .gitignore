@@ -13,3 +13,7 @@ venv/
 # pipeline.
 qa-results/
 qa-artifacts/
+
+# Written by the templates: `odm-qa-pipeline pins --gate X > requirements-X.txt`,
+# because a direct reference contains spaces and cannot be word-split into pip.
+requirements-*.txt

@@ -113,9 +113,15 @@ def build_parser() -> argparse.ArgumentParser:
                         version=f"odm-qa-pipeline {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    pins = sub.add_parser("pins", help="the version constraints, from one file")
+    pins = sub.add_parser(
+        "pins", help="the version constraints, from one file",
+        description="With --gate or --component the output is a requirements "
+                    "file, one per line. Redirect it and install with -r; do NOT "
+                    "word-split it into pip, because a direct reference contains "
+                    "spaces and the shell will break it into three arguments.")
     pins.add_argument("--component", help="print one component's requirement")
-    pins.add_argument("--gate", help="print every requirement a gate needs")
+    pins.add_argument("--gate", help="print every requirement a gate needs, "
+                                     "as a requirements file")
     pins.add_argument("--json", action="store_true")
     pins.set_defaults(handler=_pins)
 

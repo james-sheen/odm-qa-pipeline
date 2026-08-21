@@ -55,7 +55,8 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         set -u
-                        pip install --quiet $(odm-qa-pipeline pins --gate dmtf)
+                        odm-qa-pipeline pins --gate dmtf > requirements-dmtf.txt
+                        pip install --quiet -r requirements-dmtf.txt
                         mkdir -p qa-artifacts/dmtf
                         set +e
                         rf_service_validator --ip "${TARGET}" -u "${BMC_USR}" -p "${BMC_PSW}" \
@@ -85,7 +86,8 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         set -u
-                        pip install --quiet $(odm-qa-pipeline pins --gate coverage)
+                        odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
+                        pip install --quiet -r requirements-coverage.txt
                         set +e
                         bmc-sensor-audit detect --config "${CONFIG}" --target "${TARGET}" \
                             --username "${BMC_USR}" --password "${BMC_PSW}" --insecure \
@@ -111,7 +113,8 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         set -u
-                        pip install --quiet $(odm-qa-pipeline pins --gate injection)
+                        odm-qa-pipeline pins --gate injection > requirements-injection.txt
+                        pip install --quiet -r requirements-injection.txt
                         set +e
                         qa-orchestrator check "${SCENARIOS}"; parse_rc=$?
                         qa-orchestrator run   "${SCENARIOS}"; run_rc=$?
@@ -134,7 +137,8 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         set -u
-                        pip install --quiet $(odm-qa-pipeline pins --gate certificate)
+                        odm-qa-pipeline pins --gate certificate > requirements-certificate.txt
+                        pip install --quiet -r requirements-certificate.txt
                         set +e
                         cert-generator render \
                             --attestation qa-artifacts/attestation.json \
