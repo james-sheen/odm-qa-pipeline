@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "odm-qa-pipeline"
+dynamic = ["version"]
+description = "Compose the ODM QA gates and aggregate one verdict from four."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "James Sheen" }]
+keywords = ["openbmc", "redfish", "bmc", "qa", "ci", "manufacturing",
+            "odm", "conformance"]
+
+# None, and that is the design. This package composes tools; it does not import
+# them. Every gate runs as a subprocess and is judged by its exit code, so the
+# umbrella installs on a runner that has none of them yet and can report that a
+# gate did not run -- which it could not do if importing that gate were the
+# prerequisite for knowing it was missing.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pyyaml>=6"]
+
+[project.scripts]
+odm-qa-pipeline = "odm_qa_pipeline.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/james-sheen/odm-qa-pipeline"
+Source = "https://github.com/james-sheen/odm-qa-pipeline"
+Issues = "https://github.com/james-sheen/odm-qa-pipeline/issues"
+
+[tool.hatch.version]
+path = "src/odm_qa_pipeline/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/odm_qa_pipeline"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/", "tests/", "templates/", "README.md", "LICENSE", "NOTICE",
+           "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

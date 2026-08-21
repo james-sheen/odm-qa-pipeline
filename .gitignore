@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
+# Gate results and artifacts from a local pipeline run. A coverage artifact names
+# a BMC by URL, and an attestation names the machine it walked; a certificate
+# names the unit outright. None of it belongs in the repository that defines the
+# pipeline.
+qa-results/
+qa-artifacts/

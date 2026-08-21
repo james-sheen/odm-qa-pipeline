@@ -1,0 +1,145 @@
+# One canary per seam, every morning.
+#
+# Five seams join the components of this suite, and each is a place where two
+# separately released programs agree about a format, an exit code or an
+# interface. Every one of them is pinned as a range, which means a release on
+# either side lands in a consumer's environment without any repository here
+# changing -- and a seam is where that shows up first.
+#
+# Each seam is its own job so a red one is attributable at a glance. The failure
+# mode this is written against is not a canary going red; it is a canary quietly
+# passing because it stopped checking, so every job below ends by asserting that
+# it actually observed something.
+#
+# No version appears in this file. Everything installs from the manifest, which
+# is also seam five's whole subject.
+
+name: seam-canaries
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seam:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - seam: tool-engine
+            contract: "the envelope contract: schema_version 1"
+          - seam: orchestrator-tool
+            contract: "exit codes 0/1/2 and the report the orchestrator reads"
+          - seam: orchestrator-firmware
+            contract: "the mock / qemu / testbed backend interface"
+          - seam: certgen-tool
+            contract: "attestation/1 through the tool's shipped validator"
+          - seam: pipeline-all
+            contract: "every pin in the manifest still resolves"
+    name: ${{ matrix.seam }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the umbrella
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet -e '.[dev]'
+
+      - name: ${{ matrix.contract }}
+        env:
+          SEAM: ${{ matrix.seam }}
+        run: |
+          set -euo pipefail
+
+          case "${SEAM}" in
+
+          tool-engine)
+            python3 -m pip install --quiet $(odm-qa-pipeline pins --gate coverage)
+            python3 - <<'PY'
+          import json, subprocess, sys, tempfile, pathlib
+          from bmc_sensor_audit.testing.mock_redfish import MockBMC, MockSensor, serve
+          board = {"Name": "B", "Exposes": [{"Name": "T", "Type": "TMP75",
+                   "Thresholds": [{"Name": "upper critical", "Severity": 1,
+                                   "Direction": "greater than", "Value": 80}]}]}
+          bmc = MockBMC(shape="sensors")
+          bmc.sensors.append(MockSensor(name="T", reading=92.0, upper_critical=80.0))
+          with tempfile.TemporaryDirectory() as tmp:
+              tmp = pathlib.Path(tmp)
+              (tmp / "b.json").write_text(json.dumps(board))
+              with serve(bmc) as url:
+                  subprocess.run([sys.executable, "-m", "bmc_sensor_audit.cli",
+                                  "detect", "--config", str(tmp / "b.json"),
+                                  "--target", url, "--attest-out",
+                                  str(tmp / "a.json"), "--attest-target-label",
+                                  "canary"], check=False)
+              artifact = json.loads((tmp / "a.json").read_text())
+          version = artifact["engine"]["schema_version"]
+          assert version == 1, f"the engine now speaks schema_version {version}"
+          assert artifact["findings"], "the canary observed no finding; it checked nothing"
+          print(f"  schema_version {version}, {len(artifact['findings'])} finding(s)")
+          PY
+            ;;
+
+          orchestrator-tool)
+            python3 -m pip install --quiet $(odm-qa-pipeline pins --gate coverage)
+            python3 -m pip install --quiet $(odm-qa-pipeline pins --gate injection)
+            git clone --depth 1 https://github.com/james-sheen/qa-orchestrator.git o
+            qa-orchestrator run o/scenarios/stuck-at.yaml
+            echo "  the acceptance scenario still reaches its expected verdicts"
+            ;;
+
+          orchestrator-firmware)
+            python3 -m pip install --quiet $(odm-qa-pipeline pins --gate coverage)
+            python3 -m pip install --quiet $(odm-qa-pipeline pins --gate injection)
+            git clone --depth 1 https://github.com/james-sheen/qa-orchestrator.git o
+            qa-orchestrator check o/scenarios/
+            qa-orchestrator run o/scenarios/sensor-removed.yaml
+            # The tier that must keep refusing. A testbed backend that quietly
+            # constructed would let a scenario claim it pulled a real fan while
+            # touching nothing.
+            python3 - <<'PY'
+          from qa_orchestrator.backends import BackendUnavailable, build
+          try:
+              build("testbed", {})
+          except BackendUnavailable as refusal:
+              assert "not implemented" in str(refusal)
+              print("  the testbed tier still refuses, as it must")
+          else:
+              raise SystemExit("testbed constructed without a lab behind it")
+          PY
+            ;;
+
+          certgen-tool)
+            sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+            python3 -m pip install --quiet $(odm-qa-pipeline pins --gate coverage)
+            python3 -m pip install --quiet $(odm-qa-pipeline pins --gate certificate)
+            git clone --depth 1 https://github.com/james-sheen/cert-generator.git c
+            python3 -m pip install --quiet pytest
+            CERT_GENERATOR_REQUIRE_SEAM=1 CERT_GENERATOR_REQUIRE_PDF_ORACLE=1 \
+              python3 -m pytest c/tests/test_seam.py -q
+            ;;
+
+          pipeline-all)
+            # Seam five is the manifest itself. Every requirement is resolved --
+            # not installed one gate at a time, but all together, which is the
+            # only way a conflict between two pins becomes visible.
+            all=$(odm-qa-pipeline pins --json | python3 -c \
+                  'import json,sys; print(" ".join(c["requirement"] for c in json.load(sys.stdin)))')
+            echo "  resolving: ${all}"
+            python3 -m pip install --quiet --dry-run ${all}
+            echo "  every pin in the manifest resolves together"
+            odm-qa-pipeline pins
+            ;;
+
+          *)
+            echo "no such seam: ${SEAM}"; exit 2 ;;
+          esac

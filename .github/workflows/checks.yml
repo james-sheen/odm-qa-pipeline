@@ -1,0 +1,95 @@
+# Two jobs, and the split is the point.
+#
+# `suite` installs this package and nothing else. It has no runtime dependencies
+# on purpose -- that is what lets it report a gate which did not run, since
+# importing a gate cannot be the prerequisite for noticing the gate is missing.
+# If that ever stops being true, this job fails on the import rather than
+# quietly acquiring a dependency nobody chose.
+#
+# `composition` installs the whole suite and actually runs three of the four
+# gates against a mock BMC. Everything in `suite` tests this package in
+# isolation, which is not enough: the product is a composition, and a
+# composition can be wrong while every part of it is right.
+
+name: checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install this package alone
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet -e '.[dev]'
+
+      - name: It really does have no runtime dependencies
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from importlib.metadata import requires
+          runtime = [r for r in (requires("odm-qa-pipeline") or [])
+                     if "extra ==" not in r]
+          assert not runtime, f"runtime dependencies appeared: {runtime}"
+          print("  none, as declared")
+          PY
+
+      - name: The suite
+        run: python3 -m pytest tests/ -q
+
+      - name: The gates and the pins are printable
+        run: |
+          set -euo pipefail
+          odm-qa-pipeline gates
+          odm-qa-pipeline pins
+
+  composition:
+    runs-on: ubuntu-latest
+    env:
+      ODM_QA_REQUIRE_COMPOSITION: "1"
+      ODM_QA_SCENARIOS: "qa-orchestrator/scenarios"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: The whole suite, installed the way the manifest says
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet -e '.[dev]'
+          for gate in $(odm-qa-pipeline gates --json | python3 -c \
+                        'import json,sys; print(" ".join(g["name"] for g in json.load(sys.stdin)))'); do
+            requirements=$(odm-qa-pipeline pins --gate "${gate}")
+            echo "  ${gate}: ${requirements}"
+            python3 -m pip install --quiet ${requirements}
+          done
+
+      - name: The orchestrator's scenarios, from its repository
+        # Cloned rather than vendored: a copy here would be a second set of
+        # scenarios and the two would drift.
+        run: git clone --depth 1 https://github.com/james-sheen/qa-orchestrator.git
+
+      - name: Everything, with the composition test required
+        run: python3 -m pytest tests/ -q
+
+      - name: A scenario runs from this workspace, not only from its own repository
+        # The defect this job found the first time it ran: scenarios resolved
+        # their config against the working directory, so they worked from the
+        # orchestrator's root and nowhere else -- including here, which is
+        # exactly where a customer's pipeline runs them from.
+        run: qa-orchestrator run qa-orchestrator/scenarios/stuck-at.yaml

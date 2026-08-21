@@ -1,0 +1,231 @@
+# The four gates, in order, as a reusable workflow.
+#
+#   uses: james-sheen/odm-qa-pipeline/.github/workflows/odm-qa.yml@master
+#
+# Copy it into your own repository instead if you need to change the order or the
+# arguments -- it is a template, and a template you have edited is better than one
+# you have wrapped.
+#
+# ## Two things worth reading before editing it
+#
+# **No version appears here.** Every requirement comes from `odm-qa-pipeline pins`,
+# which reads one manifest. A range written into this file as well would be a
+# second copy, and the two would disagree the first time either moved.
+#
+# **Every gate records a result, including the ones that fail.** A step that exits
+# non-zero and stops the job leaves the remaining gates with nothing written, and
+# `aggregate` then reports them as never having run -- which is true, and is the
+# point. What must never happen is a gate failing *silently*: hence `set +e` around
+# each invocation, an explicit `rc`, and `if: always()` on the aggregation.
+#
+# Inputs reach the shell through `env:`, never through `${{ }}` interpolated into
+# a `run:` block. GitHub substitutes those before bash parses the line, so a
+# target URL containing a shell metacharacter would execute.
+
+name: odm-qa
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: "Redfish base URL of the machine under test"
+        required: true
+        type: string
+      config:
+        description: "entity-manager configuration file or directory"
+        required: true
+        type: string
+      identity:
+        description: "identity JSON for the certificate; without it gate 4 is skipped"
+        required: false
+        default: ""
+        type: string
+      scenarios:
+        description: "scenario file or directory for the injection gate"
+        required: false
+        default: "scenarios/"
+        type: string
+      optional-gates:
+        description: "space-separated gates declared optional, e.g. 'dmtf injection'"
+        required: false
+        default: ""
+        type: string
+      pipeline-requirement:
+        description: "how to install this tool itself"
+        required: false
+        default: "odm-qa-pipeline @ git+https://github.com/james-sheen/odm-qa-pipeline@master"
+        type: string
+      python-version:
+        required: false
+        default: "3.12"
+        type: string
+    secrets:
+      bmc-username:
+        required: false
+      bmc-password:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install the umbrella
+        env:
+          PIPELINE_REQUIREMENT: ${{ inputs.pipeline-requirement }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet "${PIPELINE_REQUIREMENT}"
+          mkdir -p qa-results
+          echo "the gates, in the order they run:"
+          odm-qa-pipeline gates
+          echo
+          odm-qa-pipeline pins
+
+      # ---------------------------------------------------------------- gate 1
+      - name: Gate 1 -- DMTF conformance
+        env:
+          TARGET: ${{ inputs.target }}
+          BMC_USER: ${{ secrets.bmc-username }}
+          BMC_PASS: ${{ secrets.bmc-password }}
+        run: |
+          set -uo pipefail
+          python3 -m pip install --quiet $(odm-qa-pipeline pins --gate dmtf)
+          mkdir -p qa-artifacts/dmtf
+          set +e
+          rf_service_validator --ip "${TARGET}" -u "${BMC_USER}" -p "${BMC_PASS}" \
+              --logdir qa-artifacts/dmtf --nochkcert
+          service_rc=$?
+          rf_protocol_validator --rhost "${TARGET}" -u "${BMC_USER}" -p "${BMC_PASS}" \
+              --report-dir qa-artifacts/dmtf --no-cert-check
+          protocol_rc=$?
+          set -e
+          # DMTF's tools do not use this suite's 0/1/2 vocabulary, so a
+          # conformance failure and a crash return the same thing. The report
+          # is the discriminator: if one was written the validator ran and
+          # disagreed with the machine; if none was, it never got that far.
+          worst=$(( service_rc > protocol_rc ? service_rc : protocol_rc ))
+          if [ "${worst}" -eq 0 ]; then
+            code=0; detail="both validators clean"
+          elif [ -n "$(find qa-artifacts/dmtf -type f 2>/dev/null | head -1)" ]; then
+            code=1; detail="validator exited ${worst} and wrote a report: non-conformance"
+          else
+            code=2; detail="validator exited ${worst} and wrote no report: it did not run"
+          fi
+          echo "  ${detail}"
+          odm-qa-pipeline record --gate dmtf --exit-code "${code}" \
+              --detail "${detail}" --artifact qa-artifacts/dmtf \
+              --out qa-results/dmtf.json
+
+      # ---------------------------------------------------------------- gate 2
+      - name: Gate 2 -- declaration coverage and liveness
+        if: always()
+        env:
+          TARGET: ${{ inputs.target }}
+          CONFIG: ${{ inputs.config }}
+          BMC_USER: ${{ secrets.bmc-username }}
+          BMC_PASS: ${{ secrets.bmc-password }}
+        run: |
+          set -uo pipefail
+          python3 -m pip install --quiet $(odm-qa-pipeline pins --gate coverage)
+          mkdir -p qa-artifacts
+          set +e
+          bmc-sensor-audit detect --config "${CONFIG}" --target "${TARGET}" \
+              --username "${BMC_USER}" --password "${BMC_PASS}" --insecure \
+              --attest-out qa-artifacts/attestation.json \
+              --attest-target-label "unit-under-test"
+          detect_rc=$?
+          bmc-sensor-audit coverage --config "${CONFIG}" --target "${TARGET}" \
+              --username "${BMC_USER}" --password "${BMC_PASS}" --insecure \
+              --json > qa-artifacts/coverage.json
+          coverage_rc=$?
+          set -e
+          code=$(( detect_rc > coverage_rc ? detect_rc : coverage_rc ))
+          odm-qa-pipeline record --gate coverage --exit-code "${code}" \
+              --detail "detect ${detect_rc}, coverage ${coverage_rc}" \
+              --artifact qa-artifacts/attestation.json \
+              --out qa-results/coverage.json
+
+      # ---------------------------------------------------------------- gate 3
+      - name: Gate 3 -- orchestrated fault injection
+        if: always()
+        env:
+          SCENARIOS: ${{ inputs.scenarios }}
+        run: |
+          set -uo pipefail
+          python3 -m pip install --quiet $(odm-qa-pipeline pins --gate injection)
+          set +e
+          qa-orchestrator check "${SCENARIOS}"
+          parse_rc=$?
+          qa-orchestrator run "${SCENARIOS}"
+          run_rc=$?
+          set -e
+          # A scenario that will not parse never tested anything, so it is
+          # incomplete rather than a disagreement.
+          if [ "${parse_rc}" -ne 0 ]; then
+            code=2; detail="a scenario would not parse; nothing was injected"
+          else
+            code=${run_rc}; detail="scenarios ran, exit ${run_rc}"
+          fi
+          odm-qa-pipeline record --gate injection --exit-code "${code}" \
+              --detail "${detail}" --out qa-results/injection.json
+
+      # ---------------------------------------------------------------- gate 4
+      - name: Gate 4 -- certificate
+        if: always()
+        env:
+          IDENTITY: ${{ inputs.identity }}
+        run: |
+          set -uo pipefail
+          if [ -z "${IDENTITY}" ]; then
+            echo "  no identity supplied; declare 'certificate' optional if that is deliberate"
+            exit 0
+          fi
+          python3 -m pip install --quiet $(odm-qa-pipeline pins --gate certificate)
+          set +e
+          cert-generator render \
+              --attestation qa-artifacts/attestation.json \
+              --coverage qa-artifacts/coverage.json \
+              --identity "${IDENTITY}" \
+              --out-json qa-artifacts/certificate.json \
+              --out-pdf qa-artifacts/certificate.pdf
+          code=$?
+          set -e
+          odm-qa-pipeline record --gate certificate --exit-code "${code}" \
+              --detail "rendered from the gate 2 attestation" \
+              --artifact qa-artifacts/certificate.pdf \
+              --out qa-results/certificate.json
+
+      # ------------------------------------------------------------ the verdict
+      - name: The verdict
+        # `always()`, because the whole value of this step is reporting on gates
+        # that did not finish. Skipping it when an earlier gate failed would mean
+        # the aggregate verdict existed only for runs that went well.
+        if: always()
+        env:
+          OPTIONAL: ${{ inputs.optional-gates }}
+        run: |
+          set -uo pipefail
+          args=""
+          for gate in ${OPTIONAL}; do args="${args} --optional ${gate}"; done
+          odm-qa-pipeline aggregate --results qa-results \
+              --out qa-artifacts/summary.json ${args}
+
+      - name: Keep everything
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: odm-qa
+          path: |
+            qa-artifacts/
+            qa-results/
+          if-no-files-found: warn

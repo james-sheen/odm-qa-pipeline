@@ -1,0 +1,178 @@
+// The same four gates, for a Jenkins agent.
+//
+// This is a template. Copy it, do not wrap it.
+//
+// The structure mirrors the GitHub workflow deliberately, and the two share the
+// two properties that matter:
+//
+//   * no version constraint is written here -- `odm-qa-pipeline pins` is asked;
+//   * every gate records a result even when it fails, and the aggregate step
+//     runs in `post { always }`, because reporting on the gates that did NOT
+//     finish is the entire reason the aggregation exists.
+//
+// `catchError` with `buildResult: 'SUCCESS'` on each gate looks alarming and is
+// correct: a gate's own exit code must not decide the build. The verdict comes
+// from `odm-qa-pipeline aggregate`, which is the only step that can see all four
+// at once and notice the one that never reported.
+
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'TARGET',    defaultValue: '',            description: 'Redfish base URL')
+        string(name: 'CONFIG',    defaultValue: 'config/',     description: 'entity-manager configuration')
+        string(name: 'SCENARIOS', defaultValue: 'scenarios/',  description: 'injection scenarios')
+        string(name: 'IDENTITY',  defaultValue: '',            description: 'identity JSON; empty skips gate 4')
+        string(name: 'OPTIONAL',  defaultValue: '',            description: 'space-separated optional gates')
+        string(name: 'PIPELINE_REQUIREMENT',
+               defaultValue: 'odm-qa-pipeline @ git+https://github.com/james-sheen/odm-qa-pipeline@master',
+               description: 'how to install the umbrella itself')
+    }
+
+    environment {
+        BMC = credentials('bmc-credentials')   // BMC_USR / BMC_PSW
+        VENV = "${WORKSPACE}/.qa-venv"
+        PATH = "${WORKSPACE}/.qa-venv/bin:${PATH}"
+    }
+
+    stages {
+        stage('Install the umbrella') {
+            steps {
+                sh '''
+                    set -eu
+                    python3 -m venv "${VENV}"
+                    pip install --quiet --upgrade pip
+                    pip install --quiet "${PIPELINE_REQUIREMENT}"
+                    mkdir -p qa-results qa-artifacts
+                    odm-qa-pipeline gates
+                    odm-qa-pipeline pins
+                '''
+            }
+        }
+
+        stage('Gate 1 - DMTF conformance') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    sh '''
+                        set -u
+                        pip install --quiet $(odm-qa-pipeline pins --gate dmtf)
+                        mkdir -p qa-artifacts/dmtf
+                        set +e
+                        rf_service_validator --ip "${TARGET}" -u "${BMC_USR}" -p "${BMC_PSW}" \
+                            --logdir qa-artifacts/dmtf --nochkcert
+                        service_rc=$?
+                        rf_protocol_validator --rhost "${TARGET}" -u "${BMC_USR}" -p "${BMC_PSW}" \
+                            --report-dir qa-artifacts/dmtf --no-cert-check
+                        protocol_rc=$?
+                        set -e
+                        worst=$(( service_rc > protocol_rc ? service_rc : protocol_rc ))
+                        if [ "${worst}" -eq 0 ]; then
+                            code=0; detail="both validators clean"
+                        elif [ -n "$(find qa-artifacts/dmtf -type f 2>/dev/null | head -1)" ]; then
+                            code=1; detail="validator exited ${worst} and wrote a report"
+                        else
+                            code=2; detail="validator exited ${worst} and wrote no report"
+                        fi
+                        odm-qa-pipeline record --gate dmtf --exit-code "${code}" \
+                            --detail "${detail}" --out qa-results/dmtf.json
+                    '''
+                }
+            }
+        }
+
+        stage('Gate 2 - coverage and liveness') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    sh '''
+                        set -u
+                        pip install --quiet $(odm-qa-pipeline pins --gate coverage)
+                        set +e
+                        bmc-sensor-audit detect --config "${CONFIG}" --target "${TARGET}" \
+                            --username "${BMC_USR}" --password "${BMC_PSW}" --insecure \
+                            --attest-out qa-artifacts/attestation.json \
+                            --attest-target-label "unit-under-test"
+                        detect_rc=$?
+                        bmc-sensor-audit coverage --config "${CONFIG}" --target "${TARGET}" \
+                            --username "${BMC_USR}" --password "${BMC_PSW}" --insecure \
+                            --json > qa-artifacts/coverage.json
+                        coverage_rc=$?
+                        set -e
+                        code=$(( detect_rc > coverage_rc ? detect_rc : coverage_rc ))
+                        odm-qa-pipeline record --gate coverage --exit-code "${code}" \
+                            --detail "detect ${detect_rc}, coverage ${coverage_rc}" \
+                            --out qa-results/coverage.json
+                    '''
+                }
+            }
+        }
+
+        stage('Gate 3 - orchestrated injection') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    sh '''
+                        set -u
+                        pip install --quiet $(odm-qa-pipeline pins --gate injection)
+                        set +e
+                        qa-orchestrator check "${SCENARIOS}"; parse_rc=$?
+                        qa-orchestrator run   "${SCENARIOS}"; run_rc=$?
+                        set -e
+                        if [ "${parse_rc}" -ne 0 ]; then
+                            code=2; detail="a scenario would not parse; nothing was injected"
+                        else
+                            code=${run_rc}; detail="scenarios ran, exit ${run_rc}"
+                        fi
+                        odm-qa-pipeline record --gate injection --exit-code "${code}" \
+                            --detail "${detail}" --out qa-results/injection.json
+                    '''
+                }
+            }
+        }
+
+        stage('Gate 4 - certificate') {
+            when { expression { return params.IDENTITY?.trim() } }
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    sh '''
+                        set -u
+                        pip install --quiet $(odm-qa-pipeline pins --gate certificate)
+                        set +e
+                        cert-generator render \
+                            --attestation qa-artifacts/attestation.json \
+                            --coverage qa-artifacts/coverage.json \
+                            --identity "${IDENTITY}" \
+                            --out-json qa-artifacts/certificate.json \
+                            --out-pdf qa-artifacts/certificate.pdf
+                        code=$?
+                        set -e
+                        odm-qa-pipeline record --gate certificate --exit-code "${code}" \
+                            --detail "rendered from the gate 2 attestation" \
+                            --out qa-results/certificate.json
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // The only step that can see all four gates at once, and therefore
+            // the only one that can report the gate which never ran.
+            sh '''
+                set -u
+                args=""
+                for gate in ${OPTIONAL}; do args="${args} --optional ${gate}"; done
+                set +e
+                odm-qa-pipeline aggregate --results qa-results \
+                    --out qa-artifacts/summary.json ${args}
+                verdict=$?
+                set -e
+                echo "aggregate exit ${verdict}"
+                # 0 clean, 1 regressions, 2 could not complete. Both non-zero
+                # codes fail the build; the summary says which, and why.
+                exit "${verdict}"
+            '''
+            archiveArtifacts artifacts: 'qa-artifacts/**, qa-results/**',
+                             allowEmptyArchive: true
+        }
+    }
+}

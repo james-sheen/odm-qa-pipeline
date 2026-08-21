@@ -1,0 +1,43 @@
+odm-qa-pipeline
+Copyright 2026 James Sheen
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.
+
+DEPENDENCIES
+
+This package has none at runtime, deliberately. It composes the tools below by
+running them as subprocesses and reading their exit codes; it imports none of
+them, which is why it can report that a gate did not run at all.
+
+Named in `src/odm_qa_pipeline/pins.json` and installed by the pipeline, not by
+this package:
+
+    bmc-sensor-audit             Apache-2.0
+    arbiter-engine               Apache-2.0
+    qa-orchestrator              Apache-2.0
+    cert-generator               Apache-2.0
+    redfish-service-validator    BSD-3-Clause   -- DMTF
+    redfish-protocol-validator   BSD-3-Clause   -- DMTF
+
+The two DMTF validators are adopted, not built, and are not redistributed here.
+Their licences are their own; the strings above were read from the published
+distributions and are recorded for orientation, not as a grant.
+
+REDISTRIBUTED THIRD-PARTY CONTENT
+
+None.
+
+NOT AFFILIATED
+
+This project runs DMTF's published Redfish validators as one of four gates. It
+is not affiliated with, endorsed by, or part of DMTF, the OpenBMC project, or
+Jenkins. The templates under `templates/` are examples for those systems and
+carry no endorsement by them.
