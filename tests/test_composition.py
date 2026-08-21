@@ -24,6 +24,7 @@ import json
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -193,12 +194,22 @@ class TestTheInjectionGate:
     that is missing is worth pinning."""
 
     def test_the_shipped_scenarios_parse_and_run(self, workspace):
-        scenarios = os.environ.get("ODM_QA_SCENARIOS")
-        if not scenarios:
+        named = os.environ.get("ODM_QA_SCENARIOS")
+        if not named:
             _require("no scenario directory given; set ODM_QA_SCENARIOS to the "
                      "orchestrator's scenarios/ to exercise gate 3")
-        parse = workspace["run"](["qa-orchestrator", "check", scenarios])
+        # Resolved against pytest's own working directory, because the gates run
+        # from a temporary workspace and a relative value would vanish there.
+        # `ODM_QA_SCENARIOS=qa-orchestrator/scenarios` is the natural thing to
+        # write in a workflow and it must keep working -- the caller should not
+        # have to know where this test chooses to run subprocesses.
+        scenarios = Path(named).resolve()
+        if not scenarios.is_dir():
+            _require(f"ODM_QA_SCENARIOS names {scenarios}, which is not a "
+                     f"directory; gate 3 was not exercised")
+
+        parse = workspace["run"](["qa-orchestrator", "check", str(scenarios)])
         assert parse.returncode == CLEAN, parse.stdout + parse.stderr
         run = workspace["run"](["qa-orchestrator", "run",
-                                os.path.join(scenarios, "stuck-at.yaml")])
+                                str(scenarios / "stuck-at.yaml")])
         assert run.returncode == CLEAN, run.stdout + run.stderr
