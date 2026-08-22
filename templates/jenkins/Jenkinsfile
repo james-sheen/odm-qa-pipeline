@@ -65,15 +65,21 @@ pipeline {
                         rf_protocol_validator --rhost "${TARGET}" -u "${BMC_USR}" -p "${BMC_PSW}" \
                             --report-dir qa-artifacts/dmtf --no-cert-check
                         protocol_rc=$?
+                        # Neither the exit code nor the presence of a file
+                        # answers this on its own: a service the validator
+                        # cannot reach exits as a failing machine does, having
+                        # already written its debug log. dmtf-verdict reads what
+                        # the validators wrote.
+                        #
+                        # Still inside `set +e`, deliberately. Jenkins runs sh
+                        # with -xe, and this command exits 1 or 2 by design: an
+                        # assignment from a substitution that returns non-zero
+                        # would end the stage before the gate is recorded.
+                        detail=$(odm-qa-pipeline dmtf-verdict --logdir qa-artifacts/dmtf \
+                            --service-exit "${service_rc}" --protocol-exit "${protocol_rc}")
+                        code=$?
                         set -e
-                        worst=$(( service_rc > protocol_rc ? service_rc : protocol_rc ))
-                        if [ "${worst}" -eq 0 ]; then
-                            code=0; detail="both validators clean"
-                        elif [ -n "$(find qa-artifacts/dmtf -type f 2>/dev/null | head -1)" ]; then
-                            code=1; detail="validator exited ${worst} and wrote a report"
-                        else
-                            code=2; detail="validator exited ${worst} and wrote no report"
-                        fi
+                        echo "${detail}"
                         odm-qa-pipeline record --gate dmtf --exit-code "${code}" \
                             --detail "${detail}" --out qa-results/dmtf.json
                     '''

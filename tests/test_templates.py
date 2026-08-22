@@ -8,6 +8,7 @@ themselves are what gets tested.
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -146,3 +147,48 @@ class TestTheJenkinsfileMatches:
             "catchError keeps the gates from failing the build, so the aggregate "
             "exit code has to be the thing that does; without this the pipeline "
             "is green whatever it found")
+
+
+class TestTheGateOneVerdictSurvivesSetE:
+    """`dmtf-verdict` exits `1` or `2` by design, and both templates capture it
+    into a variable. Under `set -e` that assignment ends the step -- before the
+    gate is recorded, which turns a gate that reported into a gate that vanished.
+    So the capture stays inside the `set +e` region, and these pin both halves:
+    the shell behaviour that makes it necessary, and the templates obeying it."""
+
+    def test_a_nonzero_capture_under_set_e_really_does_end_the_script(self):
+        """The premise, measured rather than remembered."""
+        done = subprocess.run(
+            ["bash", "-c", "set -e\ndetail=$(exit 2)\necho reached"],
+            capture_output=True, text=True)
+        assert done.returncode == 2
+        assert "reached" not in done.stdout
+
+    def test_the_same_capture_inside_set_plus_e_keeps_going(self):
+        done = subprocess.run(
+            ["bash", "-c", "set -e\nset +e\ndetail=$(exit 2)\ncode=$?\nset -e\n"
+                           "echo reached ${code}"],
+            capture_output=True, text=True)
+        assert done.returncode == 0
+        assert "reached 2" in done.stdout
+
+    @pytest.mark.parametrize("path", [GITHUB, JENKINS],
+                             ids=["github", "jenkins"])
+    def test_the_capture_is_not_re_armed_before_it_runs(self, path):
+        """Matched as statements, one line at a time.
+
+        Written first as `text.index("set -e", ...)` and it failed on the
+        template it was written for: the comment above the capture *explains*
+        `set -e`, and a substring search counted the explanation as the
+        statement. A word is not an instance.
+        """
+        lines = [line.strip() for line in
+                 path.read_text(encoding="utf-8").splitlines()]
+        relaxed = lines.index("set +e")
+        capture = next(i for i, line in enumerate(lines)
+                       if line.startswith("detail=$(odm-qa-pipeline dmtf-verdict"))
+        rearmed = next(i for i, line in enumerate(lines)
+                       if i > relaxed and line == "set -e")
+        assert relaxed < capture < rearmed, (
+            f"{path.name} re-arms set -e before capturing the gate 1 verdict; a "
+            f"non-zero verdict would end the step and gate 1 would go unrecorded")

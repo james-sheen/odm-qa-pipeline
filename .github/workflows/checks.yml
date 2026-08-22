@@ -61,6 +61,11 @@ jobs:
     env:
       ODM_QA_REQUIRE_COMPOSITION: "1"
       ODM_QA_SCENARIOS: "qa-orchestrator/scenarios"
+      # This job already installs every gate's requirements, so the DMTF
+      # validators are here -- which makes this the one place the gate-1 reader
+      # can be checked against a file the publisher's own code wrote. Required,
+      # so it cannot quietly become a skip.
+      ODM_QA_REQUIRE_DMTF: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

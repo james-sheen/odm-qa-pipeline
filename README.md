@@ -65,6 +65,18 @@ would return a number from a vocabulary this suite does not use, so anything out
 `{0, 1, 2}` is read as `2` and the raw code is kept beside it — *"exited 127"* is the
 useful half of that sentence.
 
+## The verdict here is not the certificate
+
+Two records run in parallel and neither contains the other. `aggregate` answers
+whether all four gates ran and what the worst thing any of them found was. The
+certificate `cert-generator` renders answers what the referee established about one
+unit — attestation, identity, and the declaration diff when supplied — and carries
+nothing from gate 1 or gate 3.
+
+Worth stating because reading either as the other goes wrong in both directions: a
+clean certificate says nothing about whether the injection gate ran, and a clean
+verdict here is not a document anyone can hand to a customer.
+
 ## Templates, not a framework
 
 Two composition templates ship here. Copy them; do not wrap them.
@@ -140,9 +152,19 @@ sibling gate and contributes nothing to that problem, deliberately. What it adds
 is the two things those validators do not do: the declaration diff and liveness.
 
 Their tools do not use this suite's three-code vocabulary, so a conformance failure
-and a crash return the same thing. The templates use the report file as the
-discriminator — written means it ran and disagreed, absent means it never got that
-far — and that is a heuristic, not a contract.
+and a service the validator could not reach return the same thing — and the service
+validator has already written its debug log by then. Scoring on *some file exists*
+therefore recorded an unreachable BMC as a regression against the machine: a `2`
+reported as a `1`, in the one gate this suite borrows rather than builds.
+
+`odm-qa-pipeline dmtf-verdict` reads what the validators wrote instead. The
+protocol half is a reading — pass and fail counts out of the `results.json` that
+tool always writes. The service half is a discrimination, because that tool
+publishes no machine-readable verdict at all: its results file is the best
+available evidence that the run reached the end, and the code says so rather than
+implying more. Both shapes were taken from the pinned versions by reading them;
+`dmtf.py` names the file and line each one came from, and anything that is not
+those shapes scores `2` rather than being guessed at.
 
 ## Where it sits
 

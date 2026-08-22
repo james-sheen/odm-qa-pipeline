@@ -109,20 +109,23 @@ jobs:
           rf_protocol_validator --rhost "${TARGET}" -u "${BMC_USER}" -p "${BMC_PASS}" \
               --report-dir qa-artifacts/dmtf --no-cert-check
           protocol_rc=$?
+          # DMTF's tools do not use this suite's 0/1/2 vocabulary, and a service
+          # they cannot reach exits exactly as a machine that failed conformance
+          # does -- having already written its debug log. So neither the exit
+          # code nor the presence of a file answers this on its own, and the
+          # rule that used to live here scored an unreachable BMC as a
+          # regression against the machine. `dmtf-verdict` reads the results the
+          # validators actually write; see `dmtf.py` for where each shape was
+          # read from.
+          #
+          # Still inside `set +e`, deliberately: this command's whole job is to
+          # exit 1 or 2, and under `set -e` an assignment from a substitution
+          # that returns non-zero ends the step before the gate is ever recorded.
+          detail=$(odm-qa-pipeline dmtf-verdict --logdir qa-artifacts/dmtf \
+              --service-exit "${service_rc}" --protocol-exit "${protocol_rc}")
+          code=$?
           set -e
-          # DMTF's tools do not use this suite's 0/1/2 vocabulary, so a
-          # conformance failure and a crash return the same thing. The report
-          # is the discriminator: if one was written the validator ran and
-          # disagreed with the machine; if none was, it never got that far.
-          worst=$(( service_rc > protocol_rc ? service_rc : protocol_rc ))
-          if [ "${worst}" -eq 0 ]; then
-            code=0; detail="both validators clean"
-          elif [ -n "$(find qa-artifacts/dmtf -type f 2>/dev/null | head -1)" ]; then
-            code=1; detail="validator exited ${worst} and wrote a report: non-conformance"
-          else
-            code=2; detail="validator exited ${worst} and wrote no report: it did not run"
-          fi
-          echo "  ${detail}"
+          echo "${detail}"
           odm-qa-pipeline record --gate dmtf --exit-code "${code}" \
               --detail "${detail}" --artifact qa-artifacts/dmtf \
               --out qa-results/dmtf.json

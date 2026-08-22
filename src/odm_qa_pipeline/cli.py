@@ -15,6 +15,7 @@ from pathlib import Path
 from . import RESULT_FORMAT, __version__
 from .aggregate import (AggregateError, aggregate, parse_assignment,
                         read_results, render)
+from .dmtf import read as read_dmtf
 from .gates import GATES, names
 from .pins import PinsError, describe, requirement, requirements_for, unpinned
 
@@ -105,6 +106,17 @@ def _record(args: argparse.Namespace) -> int:
     return EXIT_CLEAN
 
 
+def _dmtf(args: argparse.Namespace) -> int:
+    """Gate 1's verdict, read out of the validators' own output.
+
+    The detail goes to stdout so a workflow step can capture it and hand it
+    straight to `record`; the exit code is the gate's.
+    """
+    verdict = read_dmtf(args.logdir, args.service_exit, args.protocol_exit)
+    print(verdict.detail)
+    return verdict.exit_code
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="odm-qa-pipeline",
@@ -136,6 +148,24 @@ def build_parser() -> argparse.ArgumentParser:
     record.add_argument("--artifact")
     record.add_argument("--out", required=True)
     record.set_defaults(handler=_record)
+
+    dmtf = sub.add_parser(
+        "dmtf-verdict", help="score gate 1 from what the validators wrote",
+        description="The DMTF validators do not use this suite's 0/1/2 "
+                    "vocabulary, and a service they cannot reach exits the same "
+                    "way as a machine that failed conformance -- having already "
+                    "written a debug log. So neither the exit code nor the "
+                    "presence of a file is the answer on its own. This reads the "
+                    "results the tools write and says which it was.")
+    dmtf.add_argument("--logdir", required=True,
+                      help="the directory both validators were pointed at")
+    dmtf.add_argument("--service-exit", type=int,
+                      help="rf_service_validator's exit code; omitting it says "
+                           "the service validator was not run")
+    dmtf.add_argument("--protocol-exit", type=int,
+                      help="rf_protocol_validator's exit code; omitting it says "
+                           "the protocol validator was not run")
+    dmtf.set_defaults(handler=_dmtf)
 
     agg = sub.add_parser("aggregate", help="one verdict from every gate")
     agg.add_argument("--results", help="directory of gate-result documents")
