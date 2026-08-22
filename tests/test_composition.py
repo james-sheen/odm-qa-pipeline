@@ -180,12 +180,30 @@ class TestTheVerdict:
         assert result.returncode == REGRESSIONS, result.stdout
         assert "coverage" in result.stdout
 
-    def test_the_unpinned_warning_reaches_the_operator(self, workspace):
+    def test_the_verdict_carries_no_unpinned_caveat(self, workspace):
+        """The inverse of what this asserted until 0.1.1, and the flip is the
+        interesting part.
+
+        It required the warning to be present, which held only while some
+        component tracked a branch. When the last one reached the index the
+        assertion went red -- correctly, and *only in CI*, because this file
+        skips unless all four commands are on PATH. Three sibling tests making
+        the same assumption were found and fixed locally; this one was invisible
+        to every local run, which is what a composition test is for.
+
+        The warning's own mechanism is proven in `test_cli.py` against a
+        synthetic manifest, so it no longer depends on the shipped one happening
+        to carry an unpinned component.
+        """
         result = workspace["run"](["odm-qa-pipeline", "aggregate",
                                    "--results", "qa-results",
                                    "--optional", "dmtf",
                                    "--optional", "injection"])
-        assert "track a branch, not a version" in result.stdout
+        assert "track a branch, not a version" not in result.stdout, (
+            "a component has gone back to tracking a branch; that is allowed, "
+            "and this test now says the opposite of what the manifest does")
+        assert "pipeline:" in result.stdout, (
+            "the absence checked above would also pass on empty output")
 
 
 class TestTheInjectionGate:
