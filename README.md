@@ -2,8 +2,11 @@
 
 Four QA gates, in order, and one verdict from them.
 
+**Not yet released** — no tag, and no index carries this name. Install it from
+git, which is what the shipped pipeline templates already default to:
+
 ```
-pip install odm-qa-pipeline
+pip install "odm-qa-pipeline @ git+https://github.com/james-sheen/odm-qa-pipeline@master"
 
 odm-qa-pipeline gates            # what runs, and what a failure in each means
 odm-qa-pipeline pins             # every version constraint, from one file
