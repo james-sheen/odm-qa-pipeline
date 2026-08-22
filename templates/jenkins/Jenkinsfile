@@ -25,7 +25,7 @@ pipeline {
         string(name: 'IDENTITY',  defaultValue: '',            description: 'identity JSON; empty skips gate 4')
         string(name: 'OPTIONAL',  defaultValue: '',            description: 'space-separated optional gates')
         string(name: 'PIPELINE_REQUIREMENT',
-               defaultValue: 'odm-qa-pipeline @ git+https://github.com/james-sheen/odm-qa-pipeline@master',
+               defaultValue: 'odm-qa-pipeline',
                description: 'how to install the umbrella itself')
     }
 

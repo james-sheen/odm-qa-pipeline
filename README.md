@@ -2,11 +2,10 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Not yet released** — no tag, and no index carries this name. Install it from
-git, which is what the shipped pipeline templates already default to:
+**Released — 0.1.0**, tagged `v0.1.0`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
 
 ```
-pip install "odm-qa-pipeline @ git+https://github.com/james-sheen/odm-qa-pipeline@master"
+pip install odm-qa-pipeline
 
 odm-qa-pipeline gates            # what runs, and what a failure in each means
 odm-qa-pipeline pins             # every version constraint, from one file
@@ -132,17 +131,21 @@ Two repositories in this family have watched a workflow sit red-or-silent for wa
 of exactly this. The failure mode that matters is not a canary going red; it is a
 canary quietly passing because it stopped checking.
 
-## Two components are not pinned, and the manifest says so
+## One component is not pinned, and the manifest says why
 
-`qa-orchestrator` and `cert-generator` are not on any index yet, so the manifest
-tracks their default branch. **A branch is not a pin**: the same pipeline
-definition can resolve to different code on two consecutive days and nothing here
-would report a difference.
+`cert-generator` is not on any index, so the manifest tracks its default branch.
+**A branch is not a pin**: the same pipeline definition can resolve to different
+code on two consecutive days and nothing here would report a difference.
+
+The reason is specific rather than pending. PyPI ultranormalises a distribution
+name by stripping the separators, so `cert-generator` becomes `certgenerator` —
+which an unrelated project holds — and the upload is refused as *too similar to an
+existing project*. That is a name decision, not a packaging one: the repository,
+the import package and the `cert-generator` command are unaffected.
 
 That is stated in `pins.json` per component, enforced by a test — an unpublished
 component without a `why_unpinned` reason is refused — and printed on every
-`aggregate` run rather than left in a file nobody opens. It goes away when those
-two are released.
+`aggregate` run rather than left in a file nobody opens.
 
 ## The DMTF gate is adopted, not built
 

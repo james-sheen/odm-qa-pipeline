@@ -53,7 +53,7 @@ on:
       pipeline-requirement:
         description: "how to install this tool itself"
         required: false
-        default: "odm-qa-pipeline @ git+https://github.com/james-sheen/odm-qa-pipeline@master"
+        default: "odm-qa-pipeline"
         type: string
       python-version:
         required: false

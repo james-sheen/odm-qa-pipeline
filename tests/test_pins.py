@@ -94,10 +94,15 @@ class TestAnUnpinnedComponentMustSayWhatItCosts:
             pins.load(bad)
         assert "why_unpinned" in str(raised.value)
 
-    def test_the_two_unreleased_repositories_are_the_ones_flagged(self):
-        """Named rather than counted. If one of them ships and the manifest is
-        not updated, this goes red and says which."""
-        assert set(pins.unpinned()) == {"qa-orchestrator", "cert-generator"}
+    def test_the_unreleased_repository_is_the_one_flagged(self):
+        """Named rather than counted. If it ships and the manifest is not
+        updated, this goes red and says which.
+
+        It has already done that once: this read `{qa-orchestrator,
+        cert-generator}` until `qa-orchestrator` reached the index, and the red
+        was how the manifest got updated rather than something noticing later.
+        """
+        assert set(pins.unpinned()) == {"cert-generator"}
 
 
 class TestNoDefinitionRepeatsAConstraint:
