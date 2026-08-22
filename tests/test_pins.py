@@ -94,15 +94,28 @@ class TestAnUnpinnedComponentMustSayWhatItCosts:
             pins.load(bad)
         assert "why_unpinned" in str(raised.value)
 
-    def test_the_unreleased_repository_is_the_one_flagged(self):
-        """Named rather than counted. If it ships and the manifest is not
-        updated, this goes red and says which.
-
-        It has already done that once: this read `{qa-orchestrator,
-        cert-generator}` until `qa-orchestrator` reached the index, and the red
-        was how the manifest got updated rather than something noticing later.
+    def test_every_component_is_pinned_to_a_version(self):
+        """It has read three different things in one day, and each red is how the
+        manifest got updated rather than something noticing later:
+        `{qa-orchestrator, cert-generator}`, then `{cert-generator}` when the
+        orchestrator reached the index, then nothing when the certificate
+        generator did. If a component ever goes back to a branch, this names it.
         """
-        assert set(pins.unpinned()) == {"cert-generator"}
+        assert set(pins.unpinned()) == set()
+
+    def test_that_check_is_not_passing_by_finding_nothing(self):
+        """The assertion above is an empty-set comparison, which is the shape
+        that passes when the manifest is empty, unreadable, or renamed. So the
+        population it ran over is asserted separately."""
+        components = pins.load()["components"]
+        assert len(components) >= 6, (
+            f"{len(components)} component(s) in the manifest; the emptiness "
+            f"check above would pass over any of them")
+        for name, entry in components.items():
+            assert entry["published"] is True, name
+            assert SPECIFIER.search(entry["requirement"]), (
+                f"{name} is marked published and its requirement carries no "
+                f"version specifier, so nothing is actually pinned")
 
 
 class TestNoDefinitionRepeatsAConstraint:
@@ -158,13 +171,34 @@ class TestPinsOutputIsConsumedAsARequirementsFile:
     Python and never through a shell.
     """
 
-    def test_a_requirement_with_whitespace_actually_exists(self):
-        """Non-vacuity. If every requirement became a bare name the rule below
-        would still pass while protecting nothing, so pin the premise."""
+    def test_the_hazard_is_precautionary_now_and_says_so(self):
+        """**No shipped requirement contains whitespace at 0.1.1.**
+
+        This asserted the opposite until the last direct reference became a
+        version range, and the red was the right answer to the wrong question:
+        the premise it pinned was *the manifest currently carries a spaced
+        requirement*, which is a fact about today rather than about the rule.
+
+        The rule outlives it. pip accepts `foo >= 1.2` with spaces, a direct
+        reference returns the moment a component leaves an index again, and the
+        shipped definitions consume the manifest through a shell -- the one path
+        no Python test walks. So the guard stays and the matcher is proven
+        below on a synthetic line instead of on whatever the manifest happens
+        to hold.
+        """
         spaced = [name for name, entry in pins.load()["components"].items()
                   if " " in entry["requirement"]]
-        assert spaced, ("no requirement contains whitespace any more; if that is "
-                        "deliberate, this rule and its guard can go")
+        assert not spaced, (
+            f"{spaced} carries whitespace again; that is allowed, and this "
+            f"docstring is now out of date -- the rule below is live, not "
+            f"precautionary")
+
+    def test_the_matcher_fires_on_a_spaced_requirement(self):
+        """What the test above used to get from the manifest for free."""
+        assert PIP_LINE.search(
+            "pip install qa-orchestrator @ git+https://x.invalid/y@master 1.0")
+        assert PIP_LINE.search("pip install foo >= 1.2")
+        assert not PIP_LINE.search("pip install -r requirements-dmtf.txt")
 
     @pytest.mark.parametrize("path", shipped_definitions(),
                              ids=lambda p: p.name)

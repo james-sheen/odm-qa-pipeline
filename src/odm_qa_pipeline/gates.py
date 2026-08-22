@@ -59,7 +59,7 @@ GATES: tuple[Gate, ...] = (
     Gate(
         name="certificate",
         question="can a certificate be rendered from what was established?",
-        supplied_by=("cert-generator",),
+        supplied_by=("odm-cert-generator",),
         regression_means="the unit has findings recorded against it, or a "
                          "declared sensor was absent",
     ),

@@ -32,12 +32,11 @@
       "gate": "injection",
       "role": "Injects faults, drives walks, compares verdicts."
     },
-    "cert-generator": {
-      "requirement": "cert-generator @ git+https://github.com/james-sheen/cert-generator@master",
-      "published": false,
-      "why_unpinned": "PyPI refused the name: `cert-generator` ultranormalises to `certgenerator`, which an unrelated project already holds, so the upload returns 400 too similar to an existing project. Until a distribution name is chosen this tracks a branch, and a branch is NOT a pin: the same pipeline definition can resolve to different code on two consecutive days, and nothing here would report a difference. The repository, the import package and the command are unaffected -- only the name an index is asked for.",
+    "odm-cert-generator": {
+      "requirement": "odm-cert-generator>=0.1.0,<0.2",
+      "published": true,
       "gate": "certificate",
-      "role": "Renders the certificate and holds unit identity."
+      "role": "Renders the certificate and holds unit identity. Published as `odm-cert-generator`; the command it installs is `cert-generator`, because PyPI refuses that as a distribution name."
     }
   }
 }

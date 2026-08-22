@@ -18,11 +18,30 @@ class TestPins:
         assert "bmc-sensor-audit" in out
         assert "redfish-service-validator" in out
 
-    def test_it_marks_and_explains_the_unpinned_ones(self, capsys):
+    def test_nothing_is_marked_unpinned_today(self, capsys):
+        """Every component reached an index at 0.1.1, so this section is empty.
+        It is asserted rather than left unmentioned: an absent warning and a
+        warning nobody printed look identical from here."""
+        main(["pins"])
+        assert "* not pinned to a version:" not in capsys.readouterr().out
+
+    def test_it_marks_and_explains_an_unpinned_one_when_there_is_one(
+            self, capsys, monkeypatch):
+        """The behaviour, proven against a synthetic manifest.
+
+        It used to be proven against the shipped one, which worked only while
+        something was actually unpinned -- so the day the last component was
+        released, the check that the warning *works* would have disappeared
+        along with the warning.
+        """
+        monkeypatch.setattr(
+            "odm_qa_pipeline.cli.unpinned",
+            lambda: {"example-tool": "tracks a branch while its name is decided"})
         main(["pins"])
         out = capsys.readouterr().out
         assert "* not pinned to a version:" in out
-        assert "qa-orchestrator" in out
+        assert "example-tool" in out
+        assert "tracks a branch" in out
 
     def test_one_component_prints_one_line(self, capsys):
         assert main(["pins", "--component", "arbiter-engine"]) == EXIT_CLEAN
@@ -95,10 +114,24 @@ class TestRecordAndAggregate:
         assert summary["verdict"] == "clean"
         assert len(summary["gates"]) == len(names())
 
-    def test_the_unpinned_note_appears_on_every_run(self, capsys):
+    def test_no_unpinned_note_appears_when_nothing_is_unpinned(self, capsys):
         argv = ["aggregate"] + [f"--gate={name}=0" for name in names()]
         main(argv)
-        assert "track a branch, not a version" in capsys.readouterr().out
+        assert "track a branch, not a version" not in capsys.readouterr().out
+
+    def test_the_unpinned_note_appears_on_every_run_when_there_is_one(
+            self, capsys, monkeypatch):
+        """Same reason as the `pins` pair: the note's whole point is to be
+        unmissable, and a test that only fires while the manifest happens to
+        carry an unpinned component stops testing it exactly when it is
+        reintroduced."""
+        monkeypatch.setattr("odm_qa_pipeline.cli.unpinned",
+                            lambda: {"example-tool": "why"})
+        argv = ["aggregate"] + [f"--gate={name}=0" for name in names()]
+        main(argv)
+        out = capsys.readouterr().out
+        assert "track a branch, not a version" in out
+        assert "example-tool" in out
 
     def test_optional_gates_are_accepted_from_the_command_line(self):
         argv = ["aggregate", "--optional", "certificate"]

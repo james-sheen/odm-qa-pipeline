@@ -11,7 +11,7 @@ that none of them can contribute for themselves:
 The version lives here and nowhere else; `pyproject.toml` reads it.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 RESULT_FORMAT = "odm-qa-pipeline/gate-result/1"
 SUMMARY_FORMAT = "odm-qa-pipeline/summary/1"

@@ -2,7 +2,7 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.1.0**, tagged `v0.1.0`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.1.1**, tagged `v0.1.1`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
 
 ```
 pip install odm-qa-pipeline
@@ -131,21 +131,20 @@ Two repositories in this family have watched a workflow sit red-or-silent for wa
 of exactly this. The failure mode that matters is not a canary going red; it is a
 canary quietly passing because it stopped checking.
 
-## One component is not pinned, and the manifest says why
+## Every component is pinned to a version
 
-`cert-generator` is not on any index, so the manifest tracks its default branch.
-**A branch is not a pin**: the same pipeline definition can resolve to different
-code on two consecutive days and nothing here would report a difference.
+As of 0.1.1 nothing here tracks a branch. **A branch is not a pin**: the same
+pipeline definition can resolve to different code on two consecutive days and
+nothing would report a difference, so the manifest carried that state explicitly
+while it was true — a `why_unpinned` reason per component, refused by a test if
+missing, and printed on every `aggregate` run rather than left in a file nobody
+opens. The mechanism stays; it currently has nothing to say.
 
-The reason is specific rather than pending. PyPI ultranormalises a distribution
-name by stripping the separators, so `cert-generator` becomes `certgenerator` —
-which an unrelated project holds — and the upload is refused as *too similar to an
-existing project*. That is a name decision, not a packaging one: the repository,
-the import package and the `cert-generator` command are unaffected.
-
-That is stated in `pins.json` per component, enforced by a test — an unpublished
-component without a `why_unpinned` reason is refused — and printed on every
-`aggregate` run rather than left in a file nobody opens.
+**One name is not what you would guess.** The certificate gate installs
+`odm-cert-generator` and runs a command called `cert-generator`. PyPI
+ultranormalises a distribution name by stripping its separators, so
+`cert-generator` collides with an unrelated `certgenerator` and is refused. Ask
+`odm-qa-pipeline pins --gate certificate` rather than typing it.
 
 ## The DMTF gate is adopted, not built
 
