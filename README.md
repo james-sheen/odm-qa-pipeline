@@ -2,7 +2,11 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.1.1**, tagged `v0.1.1`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.1.2**, tagged `v0.1.2`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+
+0.1.2 makes the coverage gate take one capture and judge it twice, and corrects
+the `arbiter-engine` floor, which had been wrong by two releases. Every
+component its manifest names was published before this was.
 
 ```
 pip install odm-qa-pipeline
