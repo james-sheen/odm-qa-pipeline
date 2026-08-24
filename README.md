@@ -146,6 +146,54 @@ ultranormalises a distribution name by stripping its separators, so
 `cert-generator` collides with an unrelated `certgenerator` and is refused. Ask
 `odm-qa-pipeline pins --gate certificate` rather than typing it.
 
+**A floor is derived, not chosen, and this manifest got one wrong.** It declared
+`arbiter-engine>=0.1.6` until 2026-08-24. Measured by running the referee's own
+Stage 2 canary against every release that range admitted: **0.1.6 fails eleven of
+its assertions and 0.1.7 fails two.** Nothing broke in practice, because a
+resolver picks the newest release either way — but a reader pinning down for
+reproducibility would have got a referee that could not do its job, on this
+manifest's word that it could. A pin is only ever exercised at one point of its
+own range, which is why the floor is the least-tested claim a project makes.
+
+**Publish order matters.** This manifest ships *inside* the wheel, so a floor
+naming a version that is not on the index yet is false for as long as that is
+true — and nothing here can check it, because that is a network question this
+file deliberately asks none of. Publish every component a floor names before
+publishing this package. Version 0.1.0 shipped a manifest that was correct for
+ten minutes and cost a second release.
+
+## The coverage gate takes ONE capture and judges it twice
+
+It used to walk the machine twice — `detect --target`, then `coverage --target` —
+so the attestation and the coverage handed to the certificate gate came from two
+different observations taken at two different moments, and the certificate
+combined them without saying so. It also asked a BMC under test to serve its whole
+sensor tree twice for one gate.
+
+The template now captures once, validates the file, and judges that file:
+
+```
+bmc-sensor-audit capture --target ... --out walk.json --print-digest
+bmc-sensor-audit validate-walk walk.json --require-complete
+bmc-sensor-audit detect   --config ... --walk walk.json --attest-out attestation.json
+bmc-sensor-audit coverage --config ... --walk walk.json --json > coverage.json
+```
+
+**Judging the file rather than the run is the point of the middle line.**
+`capture` exits `2` both when it could not reach the machine and when it reached
+the machine and one subtree answered with an error — and the second is a walk the
+tool writes on purpose, because knowing which subtree failed is the evidence.
+This gate needs a whole one, so it asks for that explicitly rather than inferring
+it from an exit code that means two things.
+
+The certificate gate is then handed the same `walk.json`, so the document records
+the handle of the exact file both verdicts came from and a recipient can match it
+with `sha256sum`.
+
+**`${PIPESTATUS[0]}`, not `$?`.** The capture is piped through `tee` to keep its
+printed handle in the artifacts, and after a pipe `$?` is `tee`'s — which succeeds
+whatever the capture did.
+
 ## The DMTF gate is adopted, not built
 
 Redfish schema and protocol conformance is DMTF's own published tooling

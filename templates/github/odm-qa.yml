@@ -144,19 +144,42 @@ jobs:
           python3 -m pip install --quiet -r requirements-coverage.txt
           mkdir -p qa-artifacts
           set +e
-          bmc-sensor-audit detect --config "${CONFIG}" --target "${TARGET}" \
+
+          # ONE capture, judged twice. This used to walk the machine twice --
+          # `detect --target` and then `coverage --target` -- so the attestation
+          # and the coverage handed to gate 4 came from two different observations
+          # taken at two different moments, and the certificate combined them
+          # without saying so. It also asked a BMC under test to serve its whole
+          # sensor tree twice for one gate.
+          bmc-sensor-audit capture --target "${TARGET}" \
               --username "${BMC_USER}" --password "${BMC_PASS}" --insecure \
+              --out qa-artifacts/walk.json --print-digest \
+              | tee qa-artifacts/capture.log
+          # PIPESTATUS, not `$?`: after a pipe `$?` is `tee`'s, which succeeds
+          # whatever the capture did.
+          capture_rc=${PIPESTATUS[0]}
+
+          # Judge the FILE, not the run. `capture` exits 2 both when it could not
+          # reach the machine and when it reached it and one subtree answered with
+          # an error; the second is a walk the tool writes on purpose. This gate
+          # needs a whole one, so it asks for that explicitly.
+          bmc-sensor-audit validate-walk qa-artifacts/walk.json --require-complete
+          walk_rc=$?
+
+          bmc-sensor-audit detect --config "${CONFIG}" --walk qa-artifacts/walk.json \
               --attest-out qa-artifacts/attestation.json \
               --attest-target-label "unit-under-test"
           detect_rc=$?
-          bmc-sensor-audit coverage --config "${CONFIG}" --target "${TARGET}" \
-              --username "${BMC_USER}" --password "${BMC_PASS}" --insecure \
+          bmc-sensor-audit coverage --config "${CONFIG}" --walk qa-artifacts/walk.json \
               --json > qa-artifacts/coverage.json
           coverage_rc=$?
           set -e
-          code=$(( detect_rc > coverage_rc ? detect_rc : coverage_rc ))
+          code=${capture_rc}
+          for rc in ${walk_rc} ${detect_rc} ${coverage_rc}; do
+            [ "${rc}" -gt "${code}" ] && code=${rc}
+          done
           odm-qa-pipeline record --gate coverage --exit-code "${code}" \
-              --detail "detect ${detect_rc}, coverage ${coverage_rc}" \
+              --detail "capture ${capture_rc}, walk ${walk_rc}, detect ${detect_rc}, coverage ${coverage_rc}" \
               --artifact qa-artifacts/attestation.json \
               --out qa-results/coverage.json
 
@@ -199,16 +222,21 @@ jobs:
           odm-qa-pipeline pins --gate certificate > requirements-certificate.txt
           python3 -m pip install --quiet -r requirements-certificate.txt
           set +e
+          # `--walk` is what ties the document to the evidence. Gate 2 captured
+          # one walk and judged it twice; naming it here means the certificate
+          # records the handle of the exact file both verdicts came from, and a
+          # recipient can match it with `sha256sum`.
           cert-generator render \
               --attestation qa-artifacts/attestation.json \
               --coverage qa-artifacts/coverage.json \
+              --walk qa-artifacts/walk.json \
               --identity "${IDENTITY}" \
               --out-json qa-artifacts/certificate.json \
               --out-pdf qa-artifacts/certificate.pdf
           code=$?
           set -e
           odm-qa-pipeline record --gate certificate --exit-code "${code}" \
-              --detail "rendered from the gate 2 attestation" \
+              --detail "rendered from the gate 2 attestation and its capture" \
               --artifact qa-artifacts/certificate.pdf \
               --out qa-results/certificate.json
 
