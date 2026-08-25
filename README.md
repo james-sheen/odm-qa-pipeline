@@ -2,9 +2,18 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.1.2**, tagged `v0.1.2`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.1.3**, tagged `v0.1.3`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
 
-0.1.2 makes the coverage gate take one capture and judge it twice, and corrects
+0.1.3 makes the Jenkins template do what 0.1.2's own page says this package
+does. The one-capture fix landed in the GitHub workflow only: the Jenkinsfile
+went on walking the machine once for `detect` and again for `coverage`, so gate
+4 still combined two observations taken moments apart, and the certificate it
+rendered named no capture at all. The test class asserting the two templates
+match pinned four structural properties and not that one. Both templates are now
+asserted against the same invocations, so a fix to one of them cannot pass while
+the other keeps the bug.
+
+0.1.2 made the coverage gate take one capture and judge it twice, and corrected
 the `arbiter-engine` floor, which had been wrong by two releases. Every
 component its manifest names was published before this was.
 
