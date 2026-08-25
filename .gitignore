@@ -17,3 +17,11 @@ qa-artifacts/
 # Written by the templates: `odm-qa-pipeline pins --gate X > requirements-X.txt`,
 # because a direct reference contains spaces and cannot be word-split into pip.
 requirements-*.txt
+
+# Site-specific hygiene vocabulary. Untracked on purpose: a rule that forbids a
+# private name must spell that name out, so committing it here would publish
+# exactly what it exists to protect. See tools/hygiene_check.py.
+#
+# This repository had the converged tool and not this line, so the file the tool
+# reads was the one file it was unsafe to add.
+.hygiene-local.json
