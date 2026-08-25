@@ -96,6 +96,24 @@ Two composition templates ship here. Copy them; do not wrap them.
 - `templates/github/odm-qa.yml` — a reusable workflow (`workflow_call`)
 - `templates/jenkins/Jenkinsfile` — the same four gates for a Jenkins agent
 
+### The gate set is closed, and that is the design
+
+`record --gate <name>` refuses a name this package does not declare. It is worth
+saying why, because a caller who has written a fifth gate meets the refusal
+before any explanation.
+
+`aggregate` exists to report **the gate that never ran** -- the failure this
+whole package is for, a pipeline whose injection step was commented out weeks ago
+and has been green ever since. It can only do that because it knows which gates
+were expected. A name it has never heard of is indistinguishable from a typo in
+one it has, so accepting arbitrary names would trade the one thing here that
+nothing else can report for a convenience.
+
+The four also run in an order where each answers a question the next assumes, so
+a new gate needs a position and a declared question. **Adding one is a change to
+this package**, not a string a caller invents. If you have written a gate worth
+running, that is an issue worth opening.
+
 Both share the two properties that matter, and both are tested as artifacts in
 this repository's own CI rather than trusted as prose:
 

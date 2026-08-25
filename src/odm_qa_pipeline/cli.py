@@ -94,7 +94,8 @@ def _aggregate(args: argparse.Namespace) -> int:
 def _record(args: argparse.Namespace) -> int:
     """Write one gate's result, so a shell step does not hand-write JSON."""
     if args.gate not in names():
-        print(f"no gate named {args.gate!r}; this pipeline runs "
+        print(f"no gate named {args.gate!r}; the set is closed so that "
+              f"aggregate can name a gate that never ran. This pipeline runs "
               f"{', '.join(names())}", file=sys.stderr)
         return EXIT_INCOMPLETE
     payload = {"format": RESULT_FORMAT, "gate": args.gate,

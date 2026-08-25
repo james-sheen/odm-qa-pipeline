@@ -74,5 +74,11 @@ def gate(name: str) -> Gate:
     for candidate in GATES:
         if candidate.name == name:
             return candidate
-    raise KeyError(f"no gate named {name!r}; this pipeline runs "
-                   f"{', '.join(names())}")
+    raise KeyError(
+        f"no gate named {name!r}; this pipeline runs {', '.join(names())}. "
+        f"The set is closed on purpose: `aggregate` can only report a gate "
+        f"that never ran because it knows which gates were expected, and a "
+        f"name it has never heard of is indistinguishable from a typo in one "
+        f"it has. Adding a gate is a change to this package -- it needs a "
+        f"position in the order above and a declared question -- not a string "
+        f"a caller invents")

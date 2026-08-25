@@ -137,3 +137,36 @@ class TestRecordAndAggregate:
         argv = ["aggregate", "--optional", "certificate"]
         argv += [f"--gate={name}=0" for name in names()[:-1]]
         assert main(argv) == EXIT_CLEAN
+
+
+class TestTheClosedGateSetExplainsItself:
+    """A consumer meets this refusal before any explanation of it.
+
+    Building a fifth gate against this package -- a fleet-drift gate over
+    `fleet-sensor-baseline` -- ran into `record --gate fleet-drift` and stopped
+    there. The set being closed is correct; the refusal saying only *that* it is
+    closed is what made it look like an oversight.
+    """
+
+    def test_the_refusal_says_why_the_set_is_closed(self):
+        from odm_qa_pipeline.gates import gate
+        with pytest.raises(KeyError) as caught:
+            gate("fleet-drift")
+        message = str(caught.value)
+        assert "never ran" in message, (
+            "the refusal does not say what the closed set buys, so it reads as "
+            "an arbitrary restriction")
+
+    def test_the_cli_refusal_says_it_too(self, tmp_path, capsys):
+        code = main(["record", "--gate", "fleet-drift", "--exit-code", "0",
+                     "--detail", "x", "--out", str(tmp_path / "r.json")])
+        assert code == EXIT_INCOMPLETE
+        assert "never ran" in capsys.readouterr().err
+
+    def test_a_declared_gate_is_still_accepted(self, tmp_path, capsys):
+        """Non-vacuity: a refusal that refused everything would pass the two
+        above and make the package useless."""
+        out = tmp_path / "r.json"
+        assert main(["record", "--gate", "coverage", "--exit-code", "0",
+                     "--detail", "x", "--out", str(out)]) == EXIT_CLEAN
+        assert out.is_file()
