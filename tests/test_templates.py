@@ -192,3 +192,105 @@ class TestTheGateOneVerdictSurvivesSetE:
         assert relaxed < capture < rearmed, (
             f"{path.name} re-arms set -e before capturing the gate 1 verdict; a "
             f"non-zero verdict would end the step and gate 1 would go unrecorded")
+
+
+def commands(path: Path) -> list[str]:
+    """The template's shell commands, with comments dropped and continuations
+    joined.
+
+    Both halves are load-bearing. The comment in each template that *explains*
+    the two-walk defect spells out `detect --target`, so a text search over raw
+    lines finds the defect in the prose describing its removal -- the same trap
+    `TestNoScriptInjection` documents one class up. And the flags that matter
+    here sit on continuation lines, so a line-at-a-time reader sees
+    `cert-generator render` with no arguments at all.
+    """
+    joined, buffer = [], ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#") or stripped.startswith("//"):
+            continue
+        buffer += " " + stripped[:-1] if stripped.endswith("\\") else " " + stripped
+        if not stripped.endswith("\\"):
+            joined.append(" ".join(buffer.split()))
+            buffer = ""
+    return [command for command in joined if command]
+
+
+class TestOneCaptureJudgedTwice:
+    """The property that was true of the GitHub workflow one release before it
+    was true of the Jenkinsfile.
+
+    Gate 2 used to run `detect --target` and then `coverage --target`, so the
+    attestation and the coverage came from two different walks of the machine
+    taken moments apart, and gate 4 combined them into one certificate without
+    saying so. It was fixed in `templates/github/` and not in
+    `templates/jenkins/`, and nothing here noticed: the class that claims to
+    check the Jenkinsfile *matches* pins four structural properties and this was
+    not among them.
+
+    So every assertion below is parametrized over both files. A fix applied to
+    one of two copies is a fix that is already drifting.
+    """
+
+    @pytest.mark.parametrize("path", [GITHUB, JENKINS],
+                             ids=["github", "jenkins"])
+    def test_the_machine_is_walked_exactly_once(self, path):
+        captures = [c for c in commands(path)
+                    if c.startswith("bmc-sensor-audit capture")]
+        assert len(captures) == 1, (
+            f"{path.name} runs `capture` {len(captures)} times; gate 2 is one "
+            f"observation of the machine, judged more than once")
+
+    @pytest.mark.parametrize("path", [GITHUB, JENKINS],
+                             ids=["github", "jenkins"])
+    def test_the_verdicts_read_the_file_not_the_machine(self, path):
+        for command in commands(path):
+            if not re.match(r"bmc-sensor-audit (detect|coverage)\b", command):
+                continue
+            assert "--walk" in command, (
+                f"{path.name}: {command.split()[1]} does not read the captured "
+                f"walk")
+            assert "--target" not in command, (
+                f"{path.name}: {command.split()[1]} walks the machine again "
+                f"instead of judging the capture gate 2 already took")
+
+    @pytest.mark.parametrize("path", [GITHUB, JENKINS],
+                             ids=["github", "jenkins"])
+    def test_the_capture_is_checked_for_completeness(self, path):
+        checks = [c for c in commands(path)
+                  if c.startswith("bmc-sensor-audit validate-walk")]
+        assert checks, (
+            f"{path.name} never runs `validate-walk`; `capture` exits 2 both "
+            f"when it could not reach the machine and when it reached it and "
+            f"wrote a partial walk on purpose, so the exit code alone cannot "
+            f"say whether this gate got a whole one")
+        assert all("--require-complete" in c for c in checks), (
+            f"{path.name} validates the walk without --require-complete, which "
+            f"accepts the partial walk this gate cannot judge")
+
+    @pytest.mark.parametrize("path", [GITHUB, JENKINS],
+                             ids=["github", "jenkins"])
+    def test_the_certificate_names_the_capture_it_was_judged_from(self, path):
+        renders = [c for c in commands(path)
+                   if c.startswith("cert-generator render")]
+        assert renders, f"{path.name} has no certificate render"
+        for command in renders:
+            assert "--walk" in command, (
+                f"{path.name}: the certificate does not name the walk both "
+                f"verdicts came from, so nothing ties the document to the "
+                f"evidence and a recipient has no handle to match")
+
+    def test_the_two_templates_agree_on_all_of_it(self):
+        """The pairwise form of the four above.
+
+        Written because each of those could be satisfied by both files drifting
+        in the same direction. This one fails if the referee is invoked with a
+        different shape in one template than the other, whatever that shape is.
+        """
+        def shape(path):
+            return [re.sub(r'"[^"]*"', '"X"', c) for c in commands(path)
+                    if c.startswith(("bmc-sensor-audit ", "cert-generator "))]
+        assert shape(GITHUB) == shape(JENKINS), (
+            "the templates invoke the tools differently; whichever is right, "
+            "one of them is shipping the other's bug")
