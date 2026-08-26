@@ -15,7 +15,7 @@
       "role": "DMTF's own protocol conformance suite. Adopted, not built."
     },
     "bmc-sensor-audit": {
-      "requirement": "bmc-sensor-audit[detect]>=0.1.1,<0.2",
+      "requirement": "bmc-sensor-audit[detect]>=0.2.0,<0.3",
       "published": true,
       "gate": "coverage",
       "role": "The referee: declaration diff, liveness, attestation. 0.1.1 is the floor because the coverage gate calls `validate-walk` and `capture --print-digest`, and the certificate gate cites the handle they produce."
@@ -27,13 +27,13 @@
       "role": "The invariant envelope the referee reasons with. The floor is DERIVED, not chosen: the referee's own Stage 2 canary fails 11 of its assertions on 0.1.6 and 2 on 0.1.7, and passes on 0.1.8. This manifest declared >=0.1.6 until 2026-08-24, so a reader pinning down for reproducibility would have got a referee that could not do its job, on the manifest's word that it could."
     },
     "qa-orchestrator": {
-      "requirement": "qa-orchestrator>=0.1.1,<0.2",
+      "requirement": "qa-orchestrator>=0.2.0,<0.3",
       "published": true,
       "gate": "injection",
       "role": "Injects faults, drives walks, compares verdicts. 0.1.1 is the floor because earlier versions raised on a partial walk instead of judging it, which made the scenario schema's `fail` action abort the run."
     },
     "odm-cert-generator": {
-      "requirement": "odm-cert-generator>=0.1.2,<0.2",
+      "requirement": "odm-cert-generator>=0.2.0,<0.3",
       "published": true,
       "gate": "certificate",
       "role": "Renders the certificate and holds unit identity. Published as `odm-cert-generator`; the command it installs is `cert-generator`, because PyPI refuses that as a distribution name. 0.1.2 is the floor because the certificate gate passes `--walk`."

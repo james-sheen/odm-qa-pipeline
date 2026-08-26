@@ -2,7 +2,19 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.1.3**, tagged `v0.1.3`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.2.0**, tagged `v0.2.0`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+
+**0.2.0 raises three floors in `pins.json` to the 0.2.0 releases of the tools
+this pipeline runs**: the referee, the injector and the certificate renderer.
+`arbiter-engine` stays at `>=0.1.8,<0.2` — it did not break and its ceiling is
+still correct. The floors moved because the referee's 0.2.0 refuses a command
+that asks to verify and not to verify at once, and a pipeline whose manifest
+pinned below that would be handing a reader a tool that cannot do the job the
+manifest says it does.
+
+This package was published **last**, after all three were on the index. The
+manifest ships inside this wheel and asks no network questions, so nothing here
+could have caught a floor naming a version that did not exist yet.
 
 0.1.3 makes the Jenkins template do what 0.1.2's own page says this package
 does. The one-capture fix landed in the GitHub workflow only: the Jenkinsfile
