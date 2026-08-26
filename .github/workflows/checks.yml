@@ -103,7 +103,27 @@ jobs:
                         'import json,sys; print(" ".join(g["name"] for g in json.load(sys.stdin)))'); do
             odm-qa-pipeline pins --gate "${gate}" > "requirements-${gate}.txt"
             sed 's/^/    /' "requirements-${gate}.txt"
-            python3 -m pip install --quiet -r "requirements-${gate}.txt"
+            # A floor naming a version the index has not served YET and a floor
+            # naming a version that does not exist AT ALL look identical to pip,
+            # and they are opposite facts. The first resolves itself minutes
+            # after a coordinated release; the second is the defect this job is
+            # here to catch. Retry a bounded number of times, say out loud which
+            # one is being assumed, and still fail if it never resolves.
+            #
+            # This is not hypothetical: the 0.2.0 release went red here because
+            # PyPI's JSON API served odm-cert-generator 0.2.0 while the simple
+            # index pip reads still listed 0.1.3.
+            for attempt in 1 2 3 4 5 6; do
+              if python3 -m pip install --quiet -r "requirements-${gate}.txt"; then
+                break
+              fi
+              if [ "${attempt}" = 6 ]; then
+                echo "::error::${gate}: a requirement above never resolved. The index has had six tries across five minutes, so this is not lag -- the manifest names a version that is not published."
+                exit 1
+              fi
+              echo "${gate}: not resolvable yet; assuming the index has not caught up (attempt ${attempt} of 6), retrying in 50s"
+              sleep 50
+            done
           done
 
       - name: The orchestrator's scenarios, from its repository
