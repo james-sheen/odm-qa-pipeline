@@ -18,7 +18,7 @@
       "requirement": "bmc-sensor-audit[detect]>=0.2.0,<0.3",
       "published": true,
       "gate": "coverage",
-      "role": "The referee: declaration diff, liveness, attestation. 0.1.1 is the floor because the coverage gate calls `validate-walk` and `capture --print-digest`, and the certificate gate cites the handle they produce."
+      "role": "The referee: declaration diff, liveness, attestation. 0.2.0 is the floor and not a preference: from it the tool refuses `--insecure` beside `--pin-sha256` or `--cafile` rather than running unverified, and it answers `--version`. The coverage gate needs `validate-walk` and `capture --print-digest`, which is why 0.1.1 was the floor before the security fix raised it -- and this line still named 0.1.1 afterwards."
     },
     "arbiter-engine": {
       "requirement": "arbiter-engine>=0.1.8,<0.2",
@@ -27,10 +27,10 @@
       "role": "The invariant envelope the referee reasons with. The floor is DERIVED, not chosen: the referee's own Stage 2 canary fails 11 of its assertions on 0.1.6 and 2 on 0.1.7, and passes on 0.1.8. This manifest declared >=0.1.6 until 2026-08-24, so a reader pinning down for reproducibility would have got a referee that could not do its job, on the manifest's word that it could."
     },
     "qa-orchestrator": {
-      "requirement": "qa-orchestrator>=0.2.0,<0.3",
+      "requirement": "qa-orchestrator>=0.3.0,<0.4",
       "published": true,
       "gate": "injection",
-      "role": "Injects faults, drives walks, compares verdicts. 0.1.1 is the floor because earlier versions raised on a partial walk instead of judging it, which made the scenario schema's `fail` action abort the run."
+      "role": "Injects faults, drives captures, compares verdicts. 0.3.0 is the floor and not a preference: from it the harness is domain-free -- tiers, verbs, referees and report shapes come from registries, and the BMC tool with its tiers and scenarios is a vertical loaded through an entry point. `qa_orchestrator.backends` went with that change, and this pipeline read it until 2026-09-05. This line said 0.1.1 while the requirement already said 0.2.0: two records of one fact, drifted, which is what this manifest exists to prevent."
     },
     "odm-cert-generator": {
       "requirement": "odm-cert-generator>=0.2.0,<0.3",
