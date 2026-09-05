@@ -18,6 +18,7 @@ from .aggregate import (AggregateError, aggregate, parse_assignment,
 from .dmtf import read as read_dmtf
 from .gates import GATES, names
 from .pins import PinsError, describe, requirement, requirements_for, unpinned
+from .scenarios import ScenarioError, exercise
 
 EXIT_CLEAN, EXIT_REGRESSION, EXIT_INCOMPLETE = 0, 1, 2
 
@@ -118,6 +119,23 @@ def _dmtf(args: argparse.Namespace) -> int:
     return verdict.exit_code
 
 
+def _scenarios(args: argparse.Namespace) -> int:
+    """Exercise whatever scenarios a checkout ships, without naming any of them.
+
+    Here rather than in workflow YAML for the reason at the top of this file: the
+    three canaries that need it would otherwise each carry their own copy of
+    *where the scenarios live* and *which one to run*, and a path written into
+    three workflows is three things to update the day it moves.
+    """
+    try:
+        report = exercise(Path(args.root), tool=args.tool)
+    except ScenarioError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_INCOMPLETE
+    print(report.render())
+    return report.exit_code
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="odm-qa-pipeline",
@@ -178,6 +196,14 @@ def build_parser() -> argparse.ArgumentParser:
                      help="gate declared optional for this pipeline")
     agg.add_argument("--out", help="write the summary JSON here")
     agg.set_defaults(handler=_aggregate)
+
+    scen = sub.add_parser(
+        "scenarios",
+        help="run the scenarios a checkout ships, found by their format marker")
+    scen.add_argument("root", help="a checkout, or any directory beneath one")
+    scen.add_argument("--tool", default="qa-orchestrator",
+                      help="the orchestrator's console script")
+    scen.set_defaults(handler=_scenarios)
 
     return parser
 

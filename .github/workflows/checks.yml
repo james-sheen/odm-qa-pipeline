@@ -141,7 +141,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ODM_QA_REQUIRE_COMPOSITION: "1"
-      ODM_QA_SCENARIOS: "qa-orchestrator/scenarios"
+      # The CHECKOUT, not a directory inside it: the scenarios are found by
+      # their format marker wherever they sit, so this keeps working when they
+      # move. The old value still works for the same reason.
+      ODM_QA_SCENARIOS: "qa-orchestrator"
       # This job already installs every gate's requirements, so the DMTF
       # validators are here -- which makes this the one place the gate-1 reader
       # can be checked against a file the publisher's own code wrote. Required,
@@ -198,4 +201,4 @@ jobs:
         # their config against the working directory, so they worked from the
         # orchestrator's root and nowhere else -- including here, which is
         # exactly where a customer's pipeline runs them from.
-        run: qa-orchestrator run qa-orchestrator/scenarios/stuck-at.yaml
+        run: odm-qa-pipeline scenarios qa-orchestrator

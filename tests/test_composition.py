@@ -29,6 +29,7 @@ from pathlib import Path
 import pytest
 
 from odm_qa_pipeline.aggregate import CLEAN, INCOMPLETE, REGRESSIONS
+from odm_qa_pipeline.scenarios import exercise
 
 REQUIRED = os.environ.get("ODM_QA_REQUIRE_COMPOSITION") == "1"
 
@@ -226,8 +227,11 @@ class TestTheInjectionGate:
             _require(f"ODM_QA_SCENARIOS names {scenarios}, which is not a "
                      f"directory; gate 3 was not exercised")
 
-        parse = workspace["run"](["qa-orchestrator", "check", str(scenarios)])
-        assert parse.returncode == CLEAN, parse.stdout + parse.stderr
-        run = workspace["run"](["qa-orchestrator", "run",
-                                str(scenarios / "stuck-at.yaml")])
-        assert run.returncode == CLEAN, run.stdout + run.stderr
+        # A directory to SEARCH, not a directory of files: scenarios are found
+        # by their own format marker, so the checkout root and the old
+        # `scenarios/` value both work, and neither has to be right on the day
+        # the orchestrator moves them. Naming `stuck-at.yaml` here is what this
+        # replaced -- a file in another repository, cited by name from three
+        # places, with nothing checking any of them.
+        report = exercise(scenarios, run=workspace["run"])
+        assert report.exit_code == CLEAN, report.render()

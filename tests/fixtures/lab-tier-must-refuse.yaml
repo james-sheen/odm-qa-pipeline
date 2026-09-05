@@ -1,0 +1,18 @@
+# The one scenario this repository owns, and the only place it names a tier.
+#
+# The canary that uses this asserted the same thing by importing
+# `qa_orchestrator.backends` and calling `build("testbed", {})` -- a private
+# module, which the orchestrator's 0.3 rewrite deletes, renaming the exception
+# and moving the function in the same stroke. Three breaks in one line, in a job
+# that runs daily.
+#
+# Asked through the published surface instead: a scenario naming the tier, and
+# the exit code. That is the same surface the orchestrator itself insists on when
+# it refuses to import the tool it grades.
+format: qa-scenario/1
+name: the lab tier must refuse, having no lab behind it
+backend: testbed
+config: [unused-by-a-tier-that-refuses.json]
+phases:
+  - note: construction alone is the assertion; nothing should be reachable
+    walks: 1

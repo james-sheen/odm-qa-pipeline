@@ -34,8 +34,15 @@ pip install odm-qa-pipeline
 
 odm-qa-pipeline gates            # what runs, and what a failure in each means
 odm-qa-pipeline pins             # every version constraint, from one file
+odm-qa-pipeline scenarios <dir>  # run whatever scenarios a checkout ships
 odm-qa-pipeline aggregate --results qa-results
 ```
+
+`scenarios` takes a checkout, not a path to a file. It finds scenarios by the
+format marker they carry and runs the ones this build can name, so a canary here
+does not have to know where another repository keeps them — and a checkout that
+offers nothing runnable exits `2`, because a canary that silently checked nothing
+is worse than none.
 
 ## The gates
 

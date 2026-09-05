@@ -96,8 +96,10 @@ jobs:
             odm-qa-pipeline pins --gate injection > requirements-injection.txt
             python3 -m pip install --quiet -r requirements-injection.txt
             git clone --depth 1 https://github.com/james-sheen/qa-orchestrator.git o
-            qa-orchestrator run o/scenarios/stuck-at.yaml
-            echo "  the acceptance scenario still reaches its expected verdicts"
+            # Found by their format marker, never by path: these files move, and
+            # a path written into three workflows is three things to update.
+            odm-qa-pipeline scenarios o
+            echo "  the shipped scenarios still reach their expected verdicts"
             ;;
 
           orchestrator-firmware)
@@ -106,21 +108,22 @@ jobs:
             odm-qa-pipeline pins --gate injection > requirements-injection.txt
             python3 -m pip install --quiet -r requirements-injection.txt
             git clone --depth 1 https://github.com/james-sheen/qa-orchestrator.git o
-            qa-orchestrator check o/scenarios/
-            qa-orchestrator run o/scenarios/sensor-removed.yaml
-            # The tier that must keep refusing. A testbed backend that quietly
+            odm-qa-pipeline scenarios o
+            # The tier that must keep refusing. A lab tier that quietly
             # constructed would let a scenario claim it pulled a real fan while
             # touching nothing.
-            python3 - <<'PY'
-          from qa_orchestrator.backends import BackendUnavailable, build
-          try:
-              build("testbed", {})
-          except BackendUnavailable as refusal:
-              assert "not implemented" in str(refusal)
-              print("  the testbed tier still refuses, as it must")
-          else:
-              raise SystemExit("testbed constructed without a lab behind it")
-          PY
+            #
+            # Asked through the published surface. This read the tier out of
+            # `qa_orchestrator.backends` until 2026-09-05 -- a private module the
+            # 0.3 rewrite deletes, renaming the exception and moving the function
+            # with it.
+            # `|| LAB=$?` rather than a bare assignment after the command:
+            # under `set -e` the script would have exited before reading it.
+            LAB=0
+            qa-orchestrator run tests/fixtures/lab-tier-must-refuse.yaml > lab.txt 2>&1 || LAB=$?
+            test "$LAB" = "2" || { cat lab.txt; echo "the lab tier did not refuse (exit $LAB)"; exit 1; }
+            grep -q "not implemented" lab.txt || { cat lab.txt; echo "it refused for some other reason"; exit 1; }
+            echo "  the lab tier still refuses, as it must"
             ;;
 
           certgen-tool)
