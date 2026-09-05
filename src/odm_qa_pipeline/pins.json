@@ -36,7 +36,7 @@
       "requirement": "odm-cert-generator>=0.2.0,<0.3",
       "published": true,
       "gate": "certificate",
-      "role": "Renders the certificate and holds unit identity. Published as `odm-cert-generator`; the command it installs is `cert-generator`, because PyPI refuses that as a distribution name. 0.1.2 is the floor because the certificate gate passes `--walk`."
+      "role": "Renders the certificate and holds unit identity. Published as `odm-cert-generator`; the command it installs is `cert-generator`, because PyPI refuses that as a distribution name. 0.2.0 is the floor and not a preference: the certificate records `walk_digest_verified` -- whether it COMPUTED the handle from the walk or was merely handed one and checked nothing -- and only from 0.2.0 is that claim worth anything, because 0.2.0 raised this tool own referee floor so a walk cannot have been captured by a command that asked to verify and not to verify at once. 0.1.2 is where `--walk` and `--walk-digest` arrived, which is why this line named it before the verification story raised the floor past it."
     }
   }
 }

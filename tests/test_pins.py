@@ -238,3 +238,50 @@ class TestLookups:
 
     def test_an_unknown_gate_returns_nothing_rather_than_raising(self):
         assert pins.requirements_for("no-such-gate") == []
+
+
+#: A floor named in prose: `0.2.0 is the floor because ...`. The requirement is
+#: the machine-readable half of the same fact; this is the half a human reads.
+FLOOR_IN_PROSE = re.compile(r"\b(\d+(?:\.\d+)+) is the floor")
+LOWER_BOUND = re.compile(r">=\s*(\d+(?:\.\d+)*)")
+
+
+class TestTheProseAgreesWithTheRequirement:
+    """A floor stated twice is two records of one fact, and they drifted.
+
+    Measured 2026-09-05: THREE of six entries described a floor their requirement
+    had already moved past -- `0.1.1 is the floor because ...` beside `>=0.2.0`.
+    In the file whose stated purpose is stopping exactly that drift in workflows.
+    Nothing could have noticed, because only the requirement is ever executed.
+
+    The prose is not decoration: it is where the REASON lives, and a reason
+    attached to the wrong number sends a reader to look for a property that
+    version does not have.
+    """
+
+    def test_every_stated_floor_matches_its_requirement(self):
+        for entry in pins.load()["components"].values():
+            said = FLOOR_IN_PROSE.search(entry.get("role", ""))
+            if not said:
+                continue
+            bound = LOWER_BOUND.search(entry["requirement"])
+            assert bound, f"{entry['requirement']} states a floor in prose and has no >= bound"
+            assert said.group(1) == bound.group(1), (
+                f"{entry['requirement']}: the prose says {said.group(1)} is the "
+                f"floor and the requirement says {bound.group(1)}. One of them is "
+                f"a reason for a version nobody installs")
+
+    def test_some_entry_states_a_floor(self):
+        """Non-vacuity. Every assertion above is true of an entry that explains
+        nothing, so a manifest that stopped giving reasons would pass in silence."""
+        stating = [name for name, e in pins.load()["components"].items()
+                   if FLOOR_IN_PROSE.search(e.get("role", ""))]
+        assert len(stating) >= 3, (
+            f"only {stating} state a floor in prose; the check above has almost "
+            f"nothing to range over")
+
+    def test_the_matcher_finds_a_floor_when_there_is_one(self):
+        """And the guard is only worth as much as the pattern under it."""
+        assert FLOOR_IN_PROSE.search("0.2.0 is the floor and not a preference").group(1) == "0.2.0"
+        assert LOWER_BOUND.search("thing[extra]>=0.2.0,<0.3").group(1) == "0.2.0"
+        assert not FLOOR_IN_PROSE.search("the floor is where it has always been")
