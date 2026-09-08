@@ -2,7 +2,16 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.2.0**, tagged `v0.2.0`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.2.1**, tagged `v0.2.1`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+
+**0.2.1 raises the injector and referee floors together.** `qa-orchestrator` 0.3.0
+and 0.3.1 ship a scenario expecting wording `bmc-sensor-audit` changed at 0.2.5, so
+the injection gate fails on either. The two floors move as a pair -- to `>=0.3.2`
+and `>=0.2.5` -- because 0.3.2's scenarios expect the new text and a resolver still
+free to choose 0.2.4 would fail anyway. Measured at both ends rather than reasoned
+about: 0.3.2 against 0.2.4 fails the gate, against 0.2.5 and 0.2.7 it passes.
+
+Both versions were on the index before this one, as the manifest requires.
 
 **0.2.0 raises three floors in `pins.json` to the 0.2.0 releases of the tools
 this pipeline runs**: the referee, the injector and the certificate renderer.
