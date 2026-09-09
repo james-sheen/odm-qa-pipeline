@@ -175,16 +175,30 @@ containing a backtick would execute.
 
 ## One canary per seam
 
-Five seams join these components, and each has a daily canary in
-`.github/workflows/seam-canaries.yml`:
+Each seam joining these components has a daily canary in
+`.github/workflows/seam-canaries.yml`, one job apiece so a red one is
+attributable at a glance:
 
 | seam | contract |
 |---|---|
 | tool → engine | pin range; envelope `schema_version: 1` |
 | orchestrator → tool | exit codes 0/1/2; report JSON; `walk/1` |
-| orchestrator → firmware | the `mock` / `qemu` / `testbed` backend interface |
+| orchestrator → firmware | a tier that cannot do something refuses |
+| core → engine | the engine's envelope stamp against the core's own constant |
 | cert-gen → tool | `attestation/1` via the tool's shipped validator |
 | pipeline → all | every pin in the manifest still resolves |
+
+The count used to be stated here and again in the workflow. It is stated in
+neither now: a number written in two places is the drift this repository's own
+manifest exists to prevent, and a test holds this table to that matrix instead.
+
+**`orchestrator → firmware` said something else until today.** It named three
+backend tiers the orchestrator has never shipped, in the vocabulary of a module
+its 0.3 rewrite deleted. The canary itself was corrected when that happened; the
+sentence describing it was not — and an outside reviewer read the stale names
+here and repeated them back to us as findings. They are not written out again in
+this paragraph, because this file ships inside the wheel and a retired name in
+prose about its retirement is still a retired name in a published artifact.
 
 Two repositories in this family have watched a workflow sit red-or-silent for want
 of exactly this. The failure mode that matters is not a canary going red; it is a

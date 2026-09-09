@@ -1,8 +1,10 @@
 # One canary per seam, every morning.
 #
-# Five seams join the components of this suite, and each is a place where two
-# separately released programs agree about a format, an exit code or an
-# interface. Every one of them is pinned as a range, which means a release on
+# Each seam below joins two components of this suite, and each is a place where
+# two separately released programs agree about a format, an exit code or an
+# interface. The count is not written here or in the README: it was stated in
+# both, and two records of one number is the drift this repository's own
+# manifest exists to prevent. A test holds the table to this matrix instead. Every one of them is pinned as a range, which means a release on
 # either side lands in a consumer's environment without any repository here
 # changing -- and a seam is where that shows up first.
 #
@@ -36,7 +38,9 @@ jobs:
           - seam: orchestrator-tool
             contract: "exit codes 0/1/2 and the report the orchestrator reads"
           - seam: orchestrator-firmware
-            contract: "the mock / qemu / testbed backend interface"
+            contract: "a tier that cannot do something refuses"
+          - seam: core-engine
+            contract: "the engine's envelope stamp against the core's own constant"
           - seam: certgen-tool
             contract: "attestation/1 through the tool's shipped validator"
           - seam: pipeline-all
@@ -124,6 +128,65 @@ jobs:
             test "$LAB" = "2" || { cat lab.txt; echo "the lab tier did not refuse (exit $LAB)"; exit 1; }
             grep -q "not implemented" lab.txt || { cat lab.txt; echo "it refused for some other reason"; exit 1; }
             echo "  the lab tier still refuses, as it must"
+            ;;
+
+          core-engine)
+            # The referee's neutral half parses an envelope the engine stamps.
+            # Neither side declares the other -- `presence-audit` has no engine
+            # dependency and asserts that it has none -- so nothing in either
+            # package's metadata can notice the wire contract moving.
+            #
+            # The comparison is between two INSTALLED things: the version the
+            # engine stamped on a real envelope, and the version the core says
+            # it parses. Neither is a number written into this file, which is
+            # what the `tool-engine` seam above still does -- so this one fails
+            # when either side moves and can say which.
+            odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
+            python3 -m pip install --quiet -r requirements-coverage.txt
+            python3 - <<'PY'
+          import json, pathlib, subprocess, sys, tempfile
+          import arbiter_engine, presence_audit
+          from presence_audit.feeder import schema_mismatch
+          from bmc_sensor_audit.testing.mock_redfish import MockBMC, MockSensor, serve
+
+          board = {"Name": "B", "Exposes": [{"Name": "T", "Type": "TMP75",
+                   "Thresholds": [{"Name": "upper critical", "Severity": 1,
+                                   "Direction": "greater than", "Value": 80}]}]}
+          bmc = MockBMC(shape="sensors")
+          bmc.sensors.append(MockSensor(name="T", reading=92.0, upper_critical=80.0))
+          with tempfile.TemporaryDirectory() as tmp:
+              tmp = pathlib.Path(tmp)
+              (tmp / "b.json").write_text(json.dumps(board))
+              with serve(bmc) as url:
+                  subprocess.run([sys.executable, "-m", "bmc_sensor_audit.cli",
+                                  "detect", "--config", str(tmp / "b.json"),
+                                  "--target", url, "--attest-out",
+                                  str(tmp / "a.json"), "--attest-target-label",
+                                  "canary"], check=False)
+              artifact = json.loads((tmp / "a.json").read_text())
+
+          # Non-vacuity first: an envelope from a run that judged nothing would
+          # still carry a stamp, and the assertion under it would mean nothing.
+          assert artifact["findings"], "the canary observed no finding; it checked nothing"
+
+          stamped = artifact["engine"]["schema_version"]
+          parses = presence_audit.ENVELOPE_SCHEMA_VERSION
+          assert stamped == parses, (
+              f"arbiter-engine {arbiter_engine.__version__} stamped "
+              f"schema_version {stamped!r}; presence-audit "
+              f"{presence_audit.__version__} parses {parses!r}. The engine is "
+              f"the side that moved if the stamp is new, the core is the side "
+              f"that moved if the constant is")
+
+          # And the rule, not just the numbers: the core must actually accept
+          # the envelope the engine produced. Equal constants with a reader
+          # that refuses anyway is a seam that passes and does not work.
+          why = schema_mismatch({"meta": {"schema_version": stamped}})
+          assert why is None, f"the core refuses the engine's own envelope: {why}"
+
+          print(f"  engine {arbiter_engine.__version__} stamps {stamped}, "
+                f"core {presence_audit.__version__} parses {parses}")
+          PY
             ;;
 
           certgen-tool)
