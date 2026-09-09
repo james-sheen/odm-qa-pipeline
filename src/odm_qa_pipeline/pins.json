@@ -1,48 +1,48 @@
 {
-    "_why": "One home for every version constraint in this suite. The templates and the canaries read this file rather than repeating a range, because a number written in two places is a number that will disagree with itself and no check will notice. tests/test_pins.py fails if any workflow hardcodes one. PUBLISH ORDER MATTERS: this manifest ships inside the wheel, so a floor naming a version that is not on the index yet is false for as long as that is true. Nothing here can check it -- that is a network question and this file deliberately asks none -- so publish every component a floor names BEFORE publishing this package. 0.1.0 shipped a manifest that was correct for ten minutes and cost a second release.",
-    "format": "odm-qa-pipeline/pins/1",
-    "components": {
-        "redfish-service-validator": {
-            "requirement": "redfish-service-validator>=3.1,<4",
-            "published": true,
-            "gate": "dmtf",
-            "role": "DMTF's own schema conformance suite. Adopted, not built."
-        },
-        "redfish-protocol-validator": {
-            "requirement": "redfish-protocol-validator>=1.3,<2",
-            "published": true,
-            "gate": "dmtf",
-            "role": "DMTF's own protocol conformance suite. Adopted, not built."
-        },
-        "bmc-sensor-audit": {
-            "requirement": "bmc-sensor-audit[detect]>=0.2.5,<0.3",
-            "published": true,
-            "gate": "coverage",
-            "role": "The referee: declaration diff, liveness, attestation. 0.2.5 is the floor and not a preference: it reworded the finding a removed sensor produces, from the machine to the capture, and the orchestrator scenarios this manifest now admits expect the new text -- MEASURED, not assumed: qa-orchestrator 0.3.2 fails the injection gate against 0.2.4 and passes against 0.2.5. 0.2.0 was the floor before that: from it the tool refuses `--insecure` beside `--pin-sha256` or `--cafile` rather than running unverified, and it answers `--version`. The coverage gate needs `validate-walk` and `capture --print-digest`, which is why 0.1.1 was the floor before the security fix raised it -- and this line still named 0.1.1 afterwards."
-        },
-        "presence-audit": {
-            "requirement": "presence-audit>=0.1.3,<0.2",
-            "published": true,
-            "gate": "coverage",
-            "role": "The referee's neutral half: declaration against capture in three states, the model the engine reads, and the reader of the envelope it returns. Split out of bmc-sensor-audit at that tool's 0.3.0, which this manifest does not yet admit -- so the referee pinned above predates the split and does not pull this in. It is pinned directly for that reason: the seam it holds with the engine is real today and would otherwise have no version anywhere in this file. 0.1.3 is the floor and not a preference: it is the first release to publish ENVELOPE_SCHEMA_VERSION and PROTOCOL_VERSION, and the core-engine canary compares the first of those against the engine's own stamp instead of against a number written into a workflow."
-        },
-        "arbiter-engine": {
-            "requirement": "arbiter-engine>=0.1.8,<0.2",
-            "published": true,
-            "gate": "coverage",
-            "role": "The invariant envelope the referee reasons with. The floor is DERIVED, not chosen: the referee's own Stage 2 canary fails 11 of its assertions on 0.1.6 and 2 on 0.1.7, and passes on 0.1.8. This manifest declared >=0.1.6 until 2026-08-24, so a reader pinning down for reproducibility would have got a referee that could not do its job, on the manifest's word that it could."
-        },
-        "qa-orchestrator": {
-            "requirement": "qa-orchestrator>=0.3.2,<0.4",
-            "published": true,
-            "gate": "injection",
-            "role": "Injects faults, drives captures, compares verdicts. 0.3.2 is the floor and not a preference: the scenarios it ships expect the referee's current wording, and 0.3.0 and 0.3.1 ship a sensor-removed scenario expecting text the referee changed at 0.2.5 -- so both fail against every referee this manifest now admits. 0.3.0 was the floor before that: from it the harness is domain-free -- tiers, verbs, referees and report shapes come from registries, and the BMC tool with its tiers and scenarios is a vertical loaded through an entry point. `qa_orchestrator.backends` went with that change, and this pipeline read it until 2026-09-05. This line said 0.1.1 while the requirement already said 0.2.0: two records of one fact, drifted, which is what this manifest exists to prevent."
-        },
-        "odm-cert-generator": {
-            "requirement": "odm-cert-generator>=0.2.0,<0.3",
-            "published": true,
-            "gate": "certificate",
-            "role": "Renders the certificate and holds unit identity. Published as `odm-cert-generator`; the command it installs is `cert-generator`, because PyPI refuses that as a distribution name. 0.2.0 is the floor and not a preference: the certificate records `walk_digest_verified` -- whether it COMPUTED the handle from the walk or was merely handed one and checked nothing -- and only from 0.2.0 is that claim worth anything, because 0.2.0 raised this tool own referee floor so a walk cannot have been captured by a command that asked to verify and not to verify at once. 0.1.2 is where `--walk` and `--walk-digest` arrived, which is why this line named it before the verification story raised the floor past it."
-        }
+  "_why": "One home for every version constraint in this suite. The templates and the canaries read this file rather than repeating a range, because a number written in two places is a number that will disagree with itself and no check will notice. tests/test_pins.py fails if any workflow hardcodes one. PUBLISH ORDER MATTERS: this manifest ships inside the wheel, so a floor naming a version that is not on the index yet is false for as long as that is true. Nothing here can check it -- that is a network question and this file deliberately asks none -- so publish every component a floor names BEFORE publishing this package. 0.1.0 shipped a manifest that was correct for ten minutes and cost a second release.",
+  "format": "odm-qa-pipeline/pins/1",
+  "components": {
+    "redfish-service-validator": {
+      "requirement": "redfish-service-validator>=3.1,<4",
+      "published": true,
+      "gate": "dmtf",
+      "role": "DMTF's own schema conformance suite. Adopted, not built."
+    },
+    "redfish-protocol-validator": {
+      "requirement": "redfish-protocol-validator>=1.3,<2",
+      "published": true,
+      "gate": "dmtf",
+      "role": "DMTF's own protocol conformance suite. Adopted, not built."
+    },
+    "bmc-sensor-audit": {
+      "requirement": "bmc-sensor-audit[detect]>=0.2.5,<0.3",
+      "published": true,
+      "gate": "coverage",
+      "role": "The referee: declaration diff, liveness, attestation. 0.2.5 is the floor and not a preference: it reworded the finding a removed sensor produces, from the machine to the capture, and the orchestrator scenarios this manifest now admits expect the new text -- MEASURED, not assumed: qa-orchestrator 0.3.2 fails the injection gate against 0.2.4 and passes against 0.2.5. 0.2.0 was the floor before that: from it the tool refuses `--insecure` beside `--pin-sha256` or `--cafile` rather than running unverified, and it answers `--version`. The coverage gate needs `validate-walk` and `capture --print-digest`, which is why 0.1.1 was the floor before the security fix raised it -- and this line still named 0.1.1 afterwards."
+    },
+    "presence-audit": {
+      "requirement": "presence-audit>=0.1.3,<0.2",
+      "published": true,
+      "gate": "coverage",
+      "role": "The referee's neutral half: declaration against capture in three states, the model the engine reads, and the reader of the envelope it returns. Split out of bmc-sensor-audit at that tool's 0.3.0, which this manifest does not yet admit -- so the referee pinned above predates the split and does not pull this in. It is pinned directly for that reason: the seam it holds with the engine is real today and would otherwise have no version anywhere in this file. 0.1.3 is the floor and not a preference: it is the first release to publish ENVELOPE_SCHEMA_VERSION and PROTOCOL_VERSION, and the core-engine canary compares the first of those against the engine's own stamp instead of against a number written into a workflow."
+    },
+    "arbiter-engine": {
+      "requirement": "arbiter-engine>=0.1.8,<0.2",
+      "published": true,
+      "gate": "coverage",
+      "role": "The invariant envelope the referee reasons with. The floor is DERIVED, not chosen: the referee's own Stage 2 canary fails 11 of its assertions on 0.1.6 and 2 on 0.1.7, and passes on 0.1.8. This manifest declared >=0.1.6 until 2026-08-24, so a reader pinning down for reproducibility would have got a referee that could not do its job, on the manifest's word that it could."
+    },
+    "qa-orchestrator": {
+      "requirement": "qa-orchestrator>=0.3.2,<0.4",
+      "published": true,
+      "gate": "injection",
+      "role": "Injects faults, drives captures, compares verdicts. 0.3.2 is the floor and not a preference: the scenarios it ships expect the referee's current wording, and 0.3.0 and 0.3.1 ship a sensor-removed scenario expecting text the referee changed at 0.2.5 -- so both fail against every referee this manifest now admits. 0.3.0 was the floor before that: from it the harness is domain-free -- tiers, verbs, referees and report shapes come from registries, and the BMC tool with its tiers and scenarios is a vertical loaded through an entry point. `qa_orchestrator.backends` went with that change, and this pipeline read it until 2026-09-05. This line said 0.1.1 while the requirement already said 0.2.0: two records of one fact, drifted, which is what this manifest exists to prevent."
+    },
+    "odm-cert-generator": {
+      "requirement": "odm-cert-generator>=0.2.0,<0.3",
+      "published": true,
+      "gate": "certificate",
+      "role": "Renders the certificate and holds unit identity. Published as `odm-cert-generator`; the command it installs is `cert-generator`, because PyPI refuses that as a distribution name. 0.2.0 is the floor and not a preference: the certificate records `walk_digest_verified` -- whether it COMPUTED the handle from the walk or was merely handed one and checked nothing -- and only from 0.2.0 is that claim worth anything, because 0.2.0 raised this tool own referee floor so a walk cannot have been captured by a command that asked to verify and not to verify at once. 0.1.2 is where `--walk` and `--walk-digest` arrived, which is why this line named it before the verification story raised the floor past it."
     }
+  }
 }
