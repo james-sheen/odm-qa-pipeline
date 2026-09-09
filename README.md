@@ -2,7 +2,17 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.2.1**, tagged `v0.2.1`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.2.2**, tagged `v0.2.2`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+
+**0.2.2 resolves every gate a run installs in one pass.** Installing one
+gate's requirements and then another's is two resolutions into one
+environment, and the second can move a pin the first placed -- both succeed,
+so nothing reports it. Three canaries did it, and so did both templates,
+which is the half that reached other people. The referee's ceiling rises to
+`<0.4` because the certificate gate admits a version requiring it, and its
+floor to `>=0.3.0` because both ends of a range are a claim -- re-derived at
+0.3.0 and 0.3.2. `pins --gate` now repeats, and refuses a gate the manifest
+does not supply.
 
 **0.2.1 raises the injector and referee floors together.** `qa-orchestrator` 0.3.0
 and 0.3.1 ship a scenario expecting wording `bmc-sensor-audit` changed at 0.2.5, so
