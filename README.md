@@ -155,8 +155,20 @@ this repository's own CI rather than trusted as prose:
   one:
 
   ```
-  odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
-  pip install -r requirements-coverage.txt
+  odm-qa-pipeline pins --gate coverage > requirements.txt
+  pip install -r requirements.txt
+  ```
+
+  **`--gate` repeats, and a run that needs two gates must repeat it rather than
+  install twice.** Two installs into one environment are two independent
+  resolutions, and the second is free to move a pin the first placed — both
+  succeed, so nothing reports it and the gate then runs against something this
+  manifest does not describe. `tests/test_one_resolution_per_environment.py`
+  fails if any shipped definition does it.
+
+  ```
+  odm-qa-pipeline pins --gate coverage --gate certificate > requirements.txt
+  pip install -r requirements.txt
   ```
 
   Not `pip install $(odm-qa-pipeline pins --gate coverage)`. A direct reference

@@ -233,11 +233,46 @@ class TestLookups:
         with pytest.raises(pins.PinsError):
             pins.requirement("no-such-tool")
 
+    def test_several_gates_come_back_as_one_requirements_file(self):
+        """Because a caller has to be able to resolve them together.
+
+        Asking gate by gate is a resolution per gate into one environment, and
+        the later one can move a pin the earlier one placed with both installs
+        reporting success.
+        """
+        together = pins.requirements_for(["coverage", "certificate"])
+        assert together == (pins.requirements_for("coverage")
+                            + pins.requirements_for("certificate"))
+
+    def test_the_order_is_the_manifest_order_not_the_argument_order(self):
+        """So two callers naming the same gates get the same file."""
+        assert (pins.requirements_for(["certificate", "coverage"])
+                == pins.requirements_for(["coverage", "certificate"]))
+
+    def test_naming_no_gate_at_all_is_refused(self):
+        with pytest.raises(pins.PinsError):
+            pins.requirements_for([])
+
     def test_a_gate_returns_everything_it_needs(self):
         assert len(pins.requirements_for("dmtf")) == 2
 
-    def test_an_unknown_gate_returns_nothing_rather_than_raising(self):
-        assert pins.requirements_for("no-such-gate") == []
+    def test_an_unknown_gate_is_refused(self):
+        """This asserted the opposite until 2026-09-09 -- that an unknown gate
+        came back as an empty list -- and carried no reason for it.
+
+        An empty requirements file installs nothing and pip exits 0, so a
+        mistyped gate name reads exactly like a gate whose requirements were
+        satisfied. `test_every_gate_has_something_supplying_it` above already
+        refuses that outcome for a gate the manifest declares; there is no
+        reading on which it is worse to declare a gate and supply it nothing
+        than to ask for a gate that was never declared at all.
+        """
+        with pytest.raises(pins.PinsError):
+            pins.requirements_for("no-such-gate")
+        # And in company: one good gate beside a bad one must not quietly
+        # install the good one's half.
+        with pytest.raises(pins.PinsError):
+            pins.requirements_for(["coverage", "no-such-gate"])
 
 
 #: A floor named in prose: `0.2.0 is the floor because ...`. The requirement is

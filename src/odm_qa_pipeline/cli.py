@@ -151,8 +151,11 @@ def build_parser() -> argparse.ArgumentParser:
                     "word-split it into pip, because a direct reference contains "
                     "spaces and the shell will break it into three arguments.")
     pins.add_argument("--component", help="print one component's requirement")
-    pins.add_argument("--gate", help="print every requirement a gate needs, "
-                                     "as a requirements file")
+    pins.add_argument("--gate", action="append", metavar="GATE",
+                      help="print every requirement a gate needs, as a "
+                           "requirements file. REPEATABLE, and repeating it is "
+                           "how a caller gets one resolution covering several "
+                           "gates rather than one resolution each")
     pins.add_argument("--json", action="store_true")
     pins.set_defaults(handler=_pins)
 

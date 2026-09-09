@@ -67,8 +67,8 @@ jobs:
           case "${SEAM}" in
 
           tool-engine)
-            odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
-            python3 -m pip install --quiet -r requirements-coverage.txt
+            odm-qa-pipeline pins --gate coverage > requirements.txt
+            python3 -m pip install --quiet -r requirements.txt
             python3 - <<'PY'
           import json, subprocess, sys, tempfile, pathlib
           from bmc_sensor_audit.testing.mock_redfish import MockBMC, MockSensor, serve
@@ -95,10 +95,8 @@ jobs:
             ;;
 
           orchestrator-tool)
-            odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
-            python3 -m pip install --quiet -r requirements-coverage.txt
-            odm-qa-pipeline pins --gate injection > requirements-injection.txt
-            python3 -m pip install --quiet -r requirements-injection.txt
+            odm-qa-pipeline pins --gate coverage --gate injection > requirements.txt
+            python3 -m pip install --quiet -r requirements.txt
             git clone --depth 1 https://github.com/james-sheen/qa-orchestrator.git o
             # Found by their format marker, never by path: these files move, and
             # a path written into three workflows is three things to update.
@@ -107,10 +105,8 @@ jobs:
             ;;
 
           orchestrator-firmware)
-            odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
-            python3 -m pip install --quiet -r requirements-coverage.txt
-            odm-qa-pipeline pins --gate injection > requirements-injection.txt
-            python3 -m pip install --quiet -r requirements-injection.txt
+            odm-qa-pipeline pins --gate coverage --gate injection > requirements.txt
+            python3 -m pip install --quiet -r requirements.txt
             git clone --depth 1 https://github.com/james-sheen/qa-orchestrator.git o
             odm-qa-pipeline scenarios o
             # The tier that must keep refusing. A lab tier that quietly
@@ -141,8 +137,8 @@ jobs:
             # it parses. Neither is a number written into this file, which is
             # what the `tool-engine` seam above still does -- so this one fails
             # when either side moves and can say which.
-            odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
-            python3 -m pip install --quiet -r requirements-coverage.txt
+            odm-qa-pipeline pins --gate coverage > requirements.txt
+            python3 -m pip install --quiet -r requirements.txt
             python3 - <<'PY'
           import json, pathlib, subprocess, sys, tempfile
           import arbiter_engine, presence_audit
@@ -191,10 +187,8 @@ jobs:
 
           certgen-tool)
             sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
-            odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
-            python3 -m pip install --quiet -r requirements-coverage.txt
-            odm-qa-pipeline pins --gate certificate > requirements-certificate.txt
-            python3 -m pip install --quiet -r requirements-certificate.txt
+            odm-qa-pipeline pins --gate coverage --gate certificate > requirements.txt
+            python3 -m pip install --quiet -r requirements.txt
             git clone --depth 1 https://github.com/james-sheen/cert-generator.git c
             python3 -m pip install --quiet pytest
             CERT_GENERATOR_REQUIRE_SEAM=1 CERT_GENERATOR_REQUIRE_PDF_ORACLE=1 \

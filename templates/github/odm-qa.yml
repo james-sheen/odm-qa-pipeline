@@ -85,6 +85,18 @@ jobs:
           set -euo pipefail
           python3 -m pip install --quiet --upgrade pip
           python3 -m pip install --quiet "${PIPELINE_REQUIREMENT}"
+          # EVERY gate's requirements, in ONE resolution. Installed a gate at a
+          # time, as this did until 2026-09-09, the four gates run four
+          # independent resolutions into one environment -- and a later one is
+          # free to move a pin an earlier one placed. Both installs succeed, so
+          # nothing goes red; the gate you then run is simply not the one the
+          # manifest describes. The gate list is read from the tool rather than
+          # written here, so a gate added to the manifest arrives without an
+          # edit.
+          flags=$(odm-qa-pipeline gates --json | python3 -c \
+                  'import json,sys; print(" ".join("--gate " + g["name"] for g in json.load(sys.stdin)))')
+          odm-qa-pipeline pins ${flags} > requirements-all.txt
+          python3 -m pip install --quiet -r requirements-all.txt
           mkdir -p qa-results
           echo "the gates, in the order they run:"
           odm-qa-pipeline gates
@@ -99,8 +111,6 @@ jobs:
           BMC_PASS: ${{ secrets.bmc-password }}
         run: |
           set -uo pipefail
-          odm-qa-pipeline pins --gate dmtf > requirements-dmtf.txt
-          python3 -m pip install --quiet -r requirements-dmtf.txt
           mkdir -p qa-artifacts/dmtf
           set +e
           rf_service_validator --ip "${TARGET}" -u "${BMC_USER}" -p "${BMC_PASS}" \
@@ -140,8 +150,6 @@ jobs:
           BMC_PASS: ${{ secrets.bmc-password }}
         run: |
           set -uo pipefail
-          odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
-          python3 -m pip install --quiet -r requirements-coverage.txt
           mkdir -p qa-artifacts
           set +e
 
@@ -190,8 +198,6 @@ jobs:
           SCENARIOS: ${{ inputs.scenarios }}
         run: |
           set -uo pipefail
-          odm-qa-pipeline pins --gate injection > requirements-injection.txt
-          python3 -m pip install --quiet -r requirements-injection.txt
           set +e
           qa-orchestrator check "${SCENARIOS}"
           parse_rc=$?
@@ -219,8 +225,6 @@ jobs:
             echo "  no identity supplied; declare 'certificate' optional if that is deliberate"
             exit 0
           fi
-          odm-qa-pipeline pins --gate certificate > requirements-certificate.txt
-          python3 -m pip install --quiet -r requirements-certificate.txt
           set +e
           # `--walk` is what ties the document to the evidence. Gate 2 captured
           # one walk and judged it twice; naming it here means the certificate

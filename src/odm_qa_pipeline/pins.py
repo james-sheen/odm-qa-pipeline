@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 __all__ = ["PinsError", "load", "requirement", "requirements_for", "unpinned",
            "PINS_PATH"]
@@ -73,11 +73,41 @@ def requirement(name: str, path: Path | str | None = None) -> str:
     return components[name]["requirement"]
 
 
-def requirements_for(gate: str, path: Path | str | None = None) -> list[str]:
-    """Everything a single gate needs installed, in manifest order."""
-    return [entry["requirement"]
-            for entry in load(path)["components"].values()
-            if entry.get("gate") == gate]
+def requirements_for(gate: str | Iterable[str],
+                     path: Path | str | None = None) -> list[str]:
+    """Everything these gates need installed, in manifest order.
+
+    **Several gates in ONE call, because a caller has to be able to resolve
+    them together.** A step that installs one gate's requirements and then
+    another's runs two independent resolutions, and the second is free to move
+    a pin the first had just placed. Both installs succeed, so nothing says so
+    -- and the environment the step then tests in is not the one this manifest
+    describes. `odm-cert-generator` 0.2.2 did precisely that to the referee
+    pin, and the gate whose subject is *do these pins resolve* was the only one
+    resolving them the way the manifest means.
+
+    An unknown gate is refused rather than answered with an empty list. An
+    empty requirements file installs nothing and pip exits 0, so a mistyped
+    gate name would read as a gate that passed.
+    """
+    wanted = [gate] if isinstance(gate, str) else list(gate)
+    if not wanted:
+        raise PinsError("no gate named; naming none would install nothing "
+                        "and report success")
+    components = load(path)["components"]
+    supplied = {entry.get("gate") for entry in components.values()}
+    for name in wanted:
+        if name not in supplied:
+            raise PinsError(
+                f"no gate named {name!r} in the manifest; it supplies "
+                f"{', '.join(sorted(g for g in supplied if g))}")
+    seen: set[str] = set()
+    ordered = []
+    for entry in components.values():
+        if entry.get("gate") in wanted and entry["requirement"] not in seen:
+            seen.add(entry["requirement"])
+            ordered.append(entry["requirement"])
+    return ordered
 
 
 def unpinned(path: Path | str | None = None) -> dict[str, str]:

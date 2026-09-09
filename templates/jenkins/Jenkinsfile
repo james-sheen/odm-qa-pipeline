@@ -50,6 +50,17 @@ pipeline {
                     python3 -m venv "${VENV}"
                     pip install --quiet --upgrade pip
                     pip install --quiet "${PIPELINE_REQUIREMENT}"
+                    # EVERY gate's requirements, in ONE resolution. Installed a
+                    # gate at a time, as this did until 2026-09-09, the four
+                    # gates run four independent resolutions into one venv --
+                    # and a later one is free to move a pin an earlier one
+                    # placed. Both installs succeed, so nothing goes red; the
+                    # gate you then run is simply not the one the manifest
+                    # describes.
+                    flags=$(odm-qa-pipeline gates --json | python3 -c \
+                            'import json,sys; print(" ".join("--gate " + g["name"] for g in json.load(sys.stdin)))')
+                    odm-qa-pipeline pins ${flags} > requirements-all.txt
+                    pip install --quiet -r requirements-all.txt
                     mkdir -p qa-results qa-artifacts
                     odm-qa-pipeline gates
                     odm-qa-pipeline pins
@@ -62,8 +73,6 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         set -u
-                        odm-qa-pipeline pins --gate dmtf > requirements-dmtf.txt
-                        pip install --quiet -r requirements-dmtf.txt
                         mkdir -p qa-artifacts/dmtf
                         set +e
                         rf_service_validator --ip "${TARGET}" -u "${BMC_USR}" -p "${BMC_PSW}" \
@@ -99,8 +108,6 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         set -uo pipefail
-                        odm-qa-pipeline pins --gate coverage > requirements-coverage.txt
-                        pip install --quiet -r requirements-coverage.txt
                         mkdir -p qa-artifacts
                         set +e
 
@@ -153,8 +160,6 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         set -u
-                        odm-qa-pipeline pins --gate injection > requirements-injection.txt
-                        pip install --quiet -r requirements-injection.txt
                         set +e
                         qa-orchestrator check "${SCENARIOS}"; parse_rc=$?
                         qa-orchestrator run   "${SCENARIOS}"; run_rc=$?
@@ -177,8 +182,6 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         set -u
-                        odm-qa-pipeline pins --gate certificate > requirements-certificate.txt
-                        pip install --quiet -r requirements-certificate.txt
                         set +e
                         # `--walk` is what ties the document to the evidence.
                         # Gate 2 captured one walk and judged it twice; naming it
