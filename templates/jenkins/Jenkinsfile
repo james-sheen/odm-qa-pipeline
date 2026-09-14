@@ -168,16 +168,27 @@ pipeline {
                     sh '''
                         set -u
                         set +e
-                        qa-orchestrator check "${SCENARIOS}"; parse_rc=$?
-                        qa-orchestrator run   "${SCENARIOS}"; run_rc=$?
+                        # ONE verb, and it takes what SCENARIOS is allowed to
+                        # be. This ran `qa-orchestrator check` and then
+                        # `qa-orchestrator run` on the same path until
+                        # 2026-09-14, and those two disagree about what the
+                        # path is: `check` accepts a directory, `run` takes a
+                        # file and answers a directory with `Is a directory`,
+                        # exit 2. The default is a directory, so gate 3
+                        # recorded incomplete for every pipeline that took it.
+                        #
+                        # Said rather than hidden: `scenarios` treats a
+                        # malformed scenario and one this build cannot name
+                        # alike, as out of scope, because `check` reports them
+                        # identically. Only a path with nothing in scope is
+                        # incomplete.
+                        report=$(odm-qa-pipeline scenarios "${SCENARIOS}")
+                        code=$?
                         set -e
-                        if [ "${parse_rc}" -ne 0 ]; then
-                            code=2; detail="a scenario would not parse; nothing was injected"
-                        else
-                            code=${run_rc}; detail="scenarios ran, exit ${run_rc}"
-                        fi
+                        echo "${report}"
                         odm-qa-pipeline record --gate injection --exit-code "${code}" \
-                            --detail "${detail}" --out qa-results/injection.json
+                            --detail "$(printf '%s' "${report}" | head -n 1)" \
+                            --out qa-results/injection.json
                     '''
                 }
             }

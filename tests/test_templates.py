@@ -407,3 +407,40 @@ class TestEveryFlagIsOneTheToolActuallyHas:
         assert checked, (
             f"{path.name}: no validator invocation was found, so this check "
             f"passed without reading anything")
+
+
+class TestTheInjectionGateTakesWhatItsInputAllows:
+    """Gate 3 was handed a directory by its own default and given to a command
+    that takes a file.
+
+    The `scenarios` input is declared as *a scenario file or directory* and
+    defaults to `scenarios/`. Both templates then ran `qa-orchestrator check`
+    and `qa-orchestrator run` on it -- and those two disagree about what the
+    argument is. `check` walks a directory; `run` opens a file and answers a
+    directory with `[Errno 21] Is a directory`, exit 2. So gate 3 recorded
+    incomplete for every pipeline that took the default, the aggregate reported
+    a gate that never ran, and that is true and reads like a machine problem.
+
+    `odm-qa-pipeline scenarios` is the verb this package already shipped for
+    exactly this, and the templates did not call it. The composition step that
+    needed it was the one place it was missing.
+    """
+
+    @pytest.mark.parametrize("path", [GITHUB, JENKINS],
+                             ids=["github", "jenkins"])
+    def test_no_gate_hands_a_path_to_a_command_that_refuses_a_directory(self, path):
+        direct = [c for c in commands(path) if c.startswith("qa-orchestrator run")]
+        assert not direct, (
+            f"{path.name} calls {direct[0]!r}; that command takes a file and "
+            f"the scenarios input admits a directory, which is also its default")
+
+    @pytest.mark.parametrize("path", [GITHUB, JENKINS],
+                             ids=["github", "jenkins"])
+    def test_it_goes_through_the_verb_that_takes_either(self, path):
+        through = [c for c in commands(path) if "odm-qa-pipeline scenarios" in c]
+        assert len(through) == 1, (
+            f"{path.name} exercises the injection gate {len(through)} time(s) "
+            f"through 'odm-qa-pipeline scenarios'; it should be exactly once")
+        assert "${SCENARIOS}" in through[0], (
+            f"{path.name} does not pass the declared input to the gate, so the "
+            f"caller's scenarios are not the ones exercised")

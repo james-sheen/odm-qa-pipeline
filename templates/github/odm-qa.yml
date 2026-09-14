@@ -208,20 +208,32 @@ jobs:
         run: |
           set -uo pipefail
           set +e
-          qa-orchestrator check "${SCENARIOS}"
-          parse_rc=$?
-          qa-orchestrator run "${SCENARIOS}"
-          run_rc=$?
+          # ONE verb, and it takes what the input above declares. This ran
+          # `qa-orchestrator check` and then `qa-orchestrator run` on the same
+          # path until 2026-09-14 -- and those two disagree about what the path
+          # is. `check` accepts a directory; `run` takes a file and answers a
+          # directory with `Is a directory`, exit 2. The default here IS a
+          # directory, so gate 3 recorded incomplete for every pipeline that
+          # took it, and the aggregate faithfully reported a gate that never
+          # ran. `scenarios` finds them by their format marker, checks each,
+          # runs the ones this build can name, and exits 2 on a path that
+          # offers nothing runnable.
+          #
+          # One thing it does differently, said rather than hidden: a scenario
+          # this build cannot name and a malformed one are both *out of scope*,
+          # because `check` reports them identically. The gate is clean if the
+          # rest ran. Only a path with nothing in scope is incomplete.
+          #
+          # Still inside `set +e` for the reason gate 1 gives: this command's
+          # job is to exit non-zero, and `set -e` would end the step before the
+          # gate is ever recorded.
+          report=$(odm-qa-pipeline scenarios "${SCENARIOS}")
+          code=$?
           set -e
-          # A scenario that will not parse never tested anything, so it is
-          # incomplete rather than a disagreement.
-          if [ "${parse_rc}" -ne 0 ]; then
-            code=2; detail="a scenario would not parse; nothing was injected"
-          else
-            code=${run_rc}; detail="scenarios ran, exit ${run_rc}"
-          fi
+          echo "${report}"
           odm-qa-pipeline record --gate injection --exit-code "${code}" \
-              --detail "${detail}" --out qa-results/injection.json
+              --detail "$(printf '%s' "${report}" | head -n 1)" \
+              --out qa-results/injection.json
 
       # ---------------------------------------------------------------- gate 4
       - name: Gate 4 -- certificate

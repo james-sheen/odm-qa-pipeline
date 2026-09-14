@@ -71,7 +71,11 @@ class Report:
         return EXIT_CLEAN
 
     def render(self) -> str:
-        lines = [f"{len(self.found)} scenario(s) under {self.root}, "
+        # `under <root>` is wrong when the root IS the scenario, and a reader
+        # who typed a filename should see it back rather than the word under.
+        where = (str(self.root) if self.found == (self.root,)
+                 else f"under {self.root}")
+        lines = [f"{len(self.found)} scenario(s) {where}, "
                  f"{len(self.in_scope)} this build can name"]
         for path in self.out_of_scope:
             lines.append(f"  out of scope  {self._name(path)}  "
@@ -90,9 +94,12 @@ class Report:
 
     def _name(self, path: Path) -> str:
         try:
-            return str(path.relative_to(self.root))
+            relative = str(path.relative_to(self.root))
         except ValueError:
             return str(path)
+        # A file named directly is its own root, and `relative_to` calls that
+        # `.` -- which is the one name that tells a reader nothing.
+        return path.name if relative == "." else relative
 
 
 def _shell(argv: Sequence[str]) -> subprocess.CompletedProcess:
@@ -118,10 +125,27 @@ def discover(root: Path) -> tuple[Path, ...]:
 
     Sorted, so two runs over one checkout report in the same order and a diff of
     two canary logs is about the scenarios rather than about the walk.
+
+    **A single scenario file is accepted too**, and that is why gate 3 can use
+    this verb at all. Both templates declare their scenario input as *a scenario
+    file or directory* and default it to a directory, then called
+    `qa-orchestrator run` on it -- which takes a file, and answers a directory
+    with `Is a directory`. The gate recorded incomplete for every pipeline that
+    took the default. This verb was already the right shape for the directory and
+    refused the file, so it could not be swapped in until it took both.
     """
     root = Path(root)
+    if root.is_file():
+        text = root.read_text(encoding="utf-8", errors="replace")
+        if not MARKER.search(text):
+            raise ScenarioError(
+                f"{root} does not declare a scenario format, so there is "
+                f"nothing to exercise. A file is read for the same marker a "
+                f"directory walk looks for; being named directly is not a claim")
+        return (root,)
     if not root.is_dir():
-        raise ScenarioError(f"{root} is not a directory; nothing to exercise")
+        raise ScenarioError(f"{root} is neither a scenario file nor a "
+                            f"directory; nothing to exercise")
     found = []
     for path in sorted(root.rglob("*")):
         if path.suffix.lower() not in SUFFIXES or not path.is_file():

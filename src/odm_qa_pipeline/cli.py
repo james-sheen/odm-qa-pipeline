@@ -203,7 +203,8 @@ def build_parser() -> argparse.ArgumentParser:
     scen = sub.add_parser(
         "scenarios",
         help="run the scenarios a checkout ships, found by their format marker")
-    scen.add_argument("root", help="a checkout, or any directory beneath one")
+    scen.add_argument("root", help="a checkout, any directory beneath one, or "
+                                   "one scenario file")
     scen.add_argument("--tool", default="qa-orchestrator",
                       help="the orchestrator's console script")
     scen.set_defaults(handler=_scenarios)

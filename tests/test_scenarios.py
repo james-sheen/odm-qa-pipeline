@@ -67,9 +67,40 @@ class TestDiscovery:
             "# we write format: qa-scenario/2 at the top of each file\n")
         assert "notes.yaml" not in [p.name for p in discover(checkout)]
 
-    def test_a_missing_directory_is_refused_not_reported_empty(self, tmp_path):
-        with pytest.raises(ScenarioError, match="not a directory"):
+    def test_a_path_that_is_neither_is_refused_not_reported_empty(self, tmp_path):
+        with pytest.raises(ScenarioError,
+                           match="neither a scenario file nor a directory"):
             discover(tmp_path / "nope")
+
+    def test_one_scenario_file_is_found_by_naming_it(self, checkout):
+        """Gate 3's input admits a file, so the verb gate 3 calls has to.
+
+        This refused a file until 2026-09-14, which is why both templates called
+        `qa-orchestrator run` on the path instead -- and that command refuses a
+        DIRECTORY, which is what the templates default to. Each side of gate 3
+        accepted exactly what the other rejected.
+        """
+        one = checkout / "elsewhere" / "two.yml"
+        assert discover(one) == (one,)
+
+    def test_a_named_file_still_has_to_declare_itself_a_scenario(self, tmp_path):
+        """Naming a file is not a claim about what is in it.
+
+        Otherwise the marker would mean one thing for a directory walk and
+        nothing at all for a path somebody typed, and the canary would run a
+        README because it was pointed at one.
+        """
+        plain = tmp_path / "notes.yaml"
+        plain.write_text("nothing here declares a format\n")
+        with pytest.raises(ScenarioError, match="does not declare a scenario"):
+            discover(plain)
+
+    def test_a_named_file_is_exercised_like_any_other(self, checkout):
+        """The whole point: the report is the same shape either way."""
+        one = checkout / "elsewhere" / "two.yml"
+        report = exercise(one, run=_fake())
+        assert report.in_scope == (one,)
+        assert report.exit_code == EXIT_CLEAN
 
 
 class TestScope:
@@ -156,3 +187,23 @@ class TestABrokenToolIsNotAnOutOfScopeScenario:
     def test_a_documented_refusal_is_still_only_out_of_scope(self, checkout):
         report = exercise(checkout, run=_fake(default_check=2))
         assert report.out_of_scope and report.exit_code == EXIT_INCOMPLETE
+
+
+class TestTheReportReadsTheSameEitherWay:
+    """A named file is still a scenario with a name.
+
+    The first version of the single-file path rendered it as `.`, because the
+    file was its own root and `relative_to` says so. The exit code was right and
+    the line an operator reads named nothing.
+    """
+
+    def test_a_named_file_is_reported_by_its_name(self, checkout):
+        one = checkout / "elsewhere" / "two.yml"
+        rendered = exercise(one, run=_fake()).render()
+        assert "two.yml" in rendered
+        assert "\n  ok                   .\n" not in rendered
+
+    def test_a_directory_is_still_reported_as_under(self, checkout):
+        rendered = exercise(checkout, run=_fake()).render()
+        assert f"under {checkout}" in rendered
+        assert "one.yaml" in rendered and "two.yml" in rendered
