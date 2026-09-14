@@ -25,3 +25,10 @@ requirements-*.txt
 # This repository had the converged tool and not this line, so the file the tool
 # reads was the one file it was unsafe to add.
 .hygiene-local.json
+
+# The pin sweep's evidence. NOT committed, unlike the sibling repositories that
+# carry theirs: this one's probe runs weekly rather than per push and takes
+# closer to an hour, so a committed copy would spend most of its life describing
+# a manifest that has since moved. `pins.yml` uploads it as a run artifact,
+# which is the copy that always matches the run that produced it.
+tools/pin_evidence.json

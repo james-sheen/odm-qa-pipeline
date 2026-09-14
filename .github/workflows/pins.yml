@@ -1,0 +1,58 @@
+# Resolve this manifest's pins at every release each one claims.
+#
+# ITS OWN WORKFLOW, and not a job in `checks.yml`, for one reason: it is slow.
+# Seven ranges hold thirty-two in-range releases today, and each is a real
+# environment carrying every gate's requirements -- so a full run is closer to an
+# hour than a minute. A per-push job that costs that much is one somebody turns
+# off, and a check that is off is worse than one that is scheduled.
+#
+# WHY IT EXISTS AT ALL. `checks.yml`'s composition job installs the manifest and
+# runs the suite, which exercises exactly ONE point in this space: whatever the
+# resolver picked, the newest of each, the release every claim is least likely to
+# be wrong about. This manifest has already shipped a pair of pins that could not
+# both hold -- `odm-cert-generator` 0.2.2 requires the referee at `>=0.3.0` while
+# the manifest still said `<0.3` -- and pip answered it by quietly handing a gate
+# a version the manifest does not admit. Nothing went red.
+#
+# Run it after anything this manifest names is released, and before moving a
+# floor or a ceiling. `workflow_dispatch` is that button.
+name: pins
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly. Often enough that a release in any of the seven ranges is caught
+    # within days, rarely enough that an hour of runner time is not spent on
+    # every push.
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the probe's own needs
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install virtualenv
+
+      - name: Every release every range claims
+        run: python3 tools/probe_pin.py
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pin-evidence
+          path: tools/pin_evidence.json
+          if-no-files-found: warn
