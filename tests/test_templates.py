@@ -7,6 +7,9 @@ themselves are what gets tested.
 
 from __future__ import annotations
 
+import argparse
+import importlib
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -14,6 +17,12 @@ from pathlib import Path
 import pytest
 
 from odm_qa_pipeline.gates import names
+
+#: The CI switch that turns a missing validator into a red rather than a
+#: skip. Imported rather than restated: it is a contract with
+#: `.github/workflows/checks.yml`, and a second copy of it here would be a
+#: second thing to change the day it moves.
+from test_dmtf import REQUIRE
 
 ROOT = Path(__file__).resolve().parent.parent
 GITHUB = ROOT / "templates" / "github" / "odm-qa.yml"
@@ -294,3 +303,107 @@ class TestOneCaptureJudgedTwice:
         assert shape(GITHUB) == shape(JENKINS), (
             "the templates invoke the tools differently; whichever is right, "
             "one of them is shipping the other's bug")
+
+
+VALIDATORS = {"rf_service_validator": "redfish_service_validator",
+              "rf_protocol_validator": "redfish_protocol_validator"}
+
+
+def _captured_parser(module):
+    """The tool's own parser, taken before it can act on anything.
+
+    Both validators build theirs inside `main()`, so there is nothing to import.
+    """
+    captured = {}
+    original = argparse.ArgumentParser.parse_args
+
+    def spy(self, *args, **kwargs):
+        captured["parser"] = self
+        raise SystemExit(0)
+
+    argparse.ArgumentParser.parse_args = spy
+    try:
+        module.main()
+    except SystemExit:
+        pass
+    finally:
+        argparse.ArgumentParser.parse_args = original
+    assert "parser" in captured, (
+        f"{module.__name__} no longer builds its parser through parse_args, so "
+        f"this check has stopped asking the tool anything")
+    return captured["parser"]
+
+
+@pytest.fixture(scope="module")
+def parsers():
+    """Each validator's parser, or an honest reason there is none.
+
+    Module scope and module level, deliberately: a class-scoped fixture written
+    as an instance method is deprecated in pytest 9, and a fixture whose
+    declaration form quietly stops working is exactly F1.
+    """
+    required = os.environ.get(REQUIRE) == "1"
+    found = {}
+    for command, package in VALIDATORS.items():
+        try:
+            module = importlib.import_module(f"{package}.console_scripts")
+        except ImportError as error:                       # pragma: no cover
+            if required:
+                pytest.fail(f"{REQUIRE}=1 and {package} is not installed, so "
+                            f"the only oracle for gate 1's flags could not "
+                            f"run: {error}")
+            pytest.skip(f"{package} is not installed here; the templates have "
+                        f"no oracle in this environment")
+        found[command] = _captured_parser(module)
+    return found
+
+
+class TestEveryFlagIsOneTheToolActuallyHas:
+    """The class `--nochkcert` belonged to, and that nothing here could see.
+
+    Both templates sent `rf_service_validator --nochkcert` from the first
+    release until 2026-09-14. No release of DMTF's service validator has that
+    flag -- not 3.1.0, 3.1.3, 3.1.5 or 3.1.7, which is the whole range
+    `pins.json` admits, and not 2.4 or 2.5 either -- so argparse answered
+    `unrecognized arguments`, the step exited 2 before reaching the BMC, and
+    gate 1's service half never ran in any pipeline that copied either file.
+
+    `TestTheTwoTemplatesAgree` could not catch it and never will: both files
+    carried the same impossible flag, so they agreed. Two copies of one string
+    matching says nothing about whether the string is right, and every check
+    above this one compares the templates to each other or to this repository's
+    own idea of them.
+
+    So this one asks the tool. The parser is built inside `main()` in both
+    validators, which means there is nothing to import -- spying on `parse_args`
+    is how you get the published tool to state what it accepts without asking it
+    to do anything. A list of valid flags maintained here would be a third copy,
+    written from the same reading that produced the bug.
+
+    Long flags only. The short ones (`-u`, `-p`, `-r`) are single letters that
+    collide across tools by design, and `parse_known_args` cannot tell a missing
+    value from an unknown letter.
+    """
+
+    @pytest.mark.parametrize("path", [GITHUB, JENKINS],
+                             ids=["github", "jenkins"])
+    def test_the_validators_are_sent_only_flags_they_declare(self, parsers, path):
+        checked = 0
+        for command in commands(path):
+            parser = parsers.get(command.split()[0])
+            if parser is None:
+                continue
+            for flag in re.findall(r"(?<!\S)--[a-z][a-z0-9-]*", command):
+                # A value is supplied because a flag that takes one would
+                # otherwise consume the end of the list; an unknown flag comes
+                # back in `unknown` either way, and that is the whole question.
+                _, unknown = parser.parse_known_args([flag, "unused"])
+                assert flag not in unknown, (
+                    f"{path.name} sends {flag} to {command.split()[0]}, which "
+                    f"does not declare it. argparse will exit 2 on a usage "
+                    f"error before the machine is contacted, and gate 1 will "
+                    f"report incomplete for a reason that is not the machine")
+                checked += 1
+        assert checked, (
+            f"{path.name}: no validator invocation was found, so this check "
+            f"passed without reading anything")

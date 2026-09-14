@@ -75,8 +75,15 @@ pipeline {
                         set -u
                         mkdir -p qa-artifacts/dmtf
                         set +e
+                        # NO CERTIFICATE FLAG, and that is not an omission.
+                        # The service validator does not verify and has never
+                        # had an option to stop. `--nochkcert` sat here until
+                        # 2026-09-14 and exists in no release of the tool --
+                        # argparse answered `unrecognized arguments` and this
+                        # stage exited 2 before reaching the BMC. The line
+                        # below takes `--no-cert-check`, which IS real.
                         rf_service_validator --ip "${TARGET}" -u "${BMC_USR}" -p "${BMC_PSW}" \
-                            --logdir qa-artifacts/dmtf --nochkcert
+                            --logdir qa-artifacts/dmtf
                         service_rc=$?
                         rf_protocol_validator --rhost "${TARGET}" -u "${BMC_USR}" -p "${BMC_PSW}" \
                             --report-dir qa-artifacts/dmtf --no-cert-check

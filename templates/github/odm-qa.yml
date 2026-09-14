@@ -113,8 +113,17 @@ jobs:
           set -uo pipefail
           mkdir -p qa-artifacts/dmtf
           set +e
+          # NO CERTIFICATE FLAG, and that is not an omission. The service
+          # validator does not verify certificates and has never had an option
+          # to stop: `--nochkcert` sat here until 2026-09-14 and exists in no
+          # release of the tool -- not 3.1.0, 3.1.3, 3.1.5 or 3.1.7, which is
+          # the whole range this manifest admits, and not 2.4 or 2.5 either.
+          # argparse answered `unrecognized arguments` and this step exited 2
+          # before reaching the BMC, on every pipeline that ever copied this
+          # file. The line below it takes `--no-cert-check`, which IS real,
+          # and a plausible pair is how the wrong half survived reading.
           rf_service_validator --ip "${TARGET}" -u "${BMC_USER}" -p "${BMC_PASS}" \
-              --logdir qa-artifacts/dmtf --nochkcert
+              --logdir qa-artifacts/dmtf
           service_rc=$?
           rf_protocol_validator --rhost "${TARGET}" -u "${BMC_USER}" -p "${BMC_PASS}" \
               --report-dir qa-artifacts/dmtf --no-cert-check
