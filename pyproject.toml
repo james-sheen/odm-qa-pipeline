@@ -39,8 +39,15 @@ path = "src/odm_qa_pipeline/__init__.py"
 packages = ["src/odm_qa_pipeline"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/", "tests/", "templates/", "README.md", "LICENSE", "NOTICE",
-           "pyproject.toml"]
+# THE SDIST SHIPS WHAT ITS OWN TESTS READ. `tests/` is in it, and four of those
+# tests read files that were not: the hygiene and commit-message tools under
+# `tools/`, the pin probe, and the canary workflow the seam table is checked
+# against. Measured on the 0.2.2 sdist: three collection errors, so its suite
+# could not run from the artifact it ships in, and the pin probe's test made it
+# four. With these included the sdist's suite runs: 278 passed, 14 skipped --
+# the skips are the composition tests, honestly, with no gate on PATH.
+include = ["src/", "tests/", "templates/", "tools/", ".github/", ".githooks/",
+           "README.md", "LICENSE", "NOTICE", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
