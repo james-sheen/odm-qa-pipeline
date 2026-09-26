@@ -2,7 +2,20 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.2.2**, tagged `v0.2.2`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.2.3**, tagged `v0.2.3`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+
+**0.2.3 makes the templates run all four gates, and the manifest resolve.** Both
+shipped templates sent the service validator `--nochkcert`, a flag no release of
+it has, so gate 1's service half exited on a usage error for anyone who copied
+either file; and gate 3 handed a directory to a command that takes a file, so it
+recorded *incomplete* for every pipeline. Both now call what their input allows.
+The manifest moves the engine to the 0.2 line with the referee and core floors as
+one chain -- engine `>=0.2.7`, referee `>=0.3.3`, core `>=0.1.10` -- because below
+0.2 every gate resolved referee 0.3.2 on engine 0.1.18, and referee 0.3.3 to 0.3.5
+could not be installed beside the rest at all. The certificate gate's floor rises
+to 0.2.2, the first release that installs beside the others. `tools/probe_pin.py`
+now resolves every release in all seven ranges. And the sdist ships the tools
+its own tests read, so its suite runs from the artifact.
 
 **0.2.2 resolves every gate a run installs in one pass.** Installing one
 gate's requirements and then another's is two resolutions into one
