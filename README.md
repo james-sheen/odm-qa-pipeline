@@ -2,7 +2,13 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.2.3**, tagged `v0.2.3`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.2.4**, tagged `v0.2.4`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+
+**0.2.4 moves the core's pin to `>=0.1.13,<0.3`.** The referee's 0.3.7 and the
+certificate gate's 0.2.5 both require 0.1.13, the release that names a finding's
+subject `point`, so the floor rises with them; the ceiling admits the core's 0.2.0,
+which removes the old names, and the composed suite ran on 0.1.13 and on a 0.2.0
+build before it did. Nothing this pipeline reads was renamed.
 
 **0.2.3 makes the templates run all four gates, and the manifest resolve.** Both
 shipped templates sent the service validator `--nochkcert`, a flag no release of
