@@ -86,10 +86,25 @@ def _aggregate(args: argparse.Namespace) -> int:
         # two identical invocations should not keep that in a file nobody opens.
         print("  note: " + ", ".join(loose) + " track a branch, not a version")
 
-    if args.out:
-        Path(args.out).write_text(json.dumps(summary, indent=2) + "\n",
-                                  encoding="utf-8")
+    if args.out and not _written(args.out, summary, "the summary"):
+        return EXIT_INCOMPLETE
     return summary["exit_code"]
+
+
+def _written(path: str, payload: dict, what: str) -> bool:
+    """Write `payload` to `path`, or say why not. False means could-not-complete.
+
+    An unwritable path raised out of `main` as a traceback, and Python exits 1 on
+    one -- this tool's code for regressions. A result nobody could write is a
+    step that did not complete, and `2` is the only honest answer.
+    """
+    try:
+        Path(path).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    except OSError as error:
+        print(f"could not write {what} to {path}: {error.strerror or error}",
+              file=sys.stderr)
+        return False
+    return True
 
 
 def _record(args: argparse.Namespace) -> int:
@@ -103,8 +118,8 @@ def _record(args: argparse.Namespace) -> int:
                "exit_code": args.exit_code, "detail": args.detail or ""}
     if args.artifact:
         payload["artifact"] = args.artifact
-    Path(args.out).write_text(json.dumps(payload, indent=2) + "\n",
-                              encoding="utf-8")
+    if not _written(args.out, payload, f"the {args.gate} result"):
+        return EXIT_INCOMPLETE
     return EXIT_CLEAN
 
 

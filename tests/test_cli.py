@@ -105,6 +105,19 @@ class TestRecordAndAggregate:
                      str(tmp_path / "absent")]) == EXIT_INCOMPLETE
         assert "could not aggregate" in capsys.readouterr().err
 
+    def test_a_result_that_cannot_be_written_exits_two(self, tmp_path, capsys):
+        out = tmp_path / "no-such-directory" / "dmtf.json"
+        assert main(["record", "--gate", "dmtf", "--exit-code", "0",
+                     "--out", str(out)]) == EXIT_INCOMPLETE
+        err = capsys.readouterr().err
+        assert "could not write the dmtf result to" in err and "Traceback" not in err
+
+    def test_a_summary_that_cannot_be_written_exits_two(self, tmp_path, capsys):
+        argv = ["aggregate", "--out", str(tmp_path / "no-such-directory" / "s.json")]
+        argv += [f"--gate={name}=0" for name in names()]
+        assert main(argv) == EXIT_INCOMPLETE
+        assert "could not write the summary to" in capsys.readouterr().err
+
     def test_the_summary_is_written_when_asked(self, tmp_path):
         out = tmp_path / "summary.json"
         argv = ["aggregate", "--out", str(out)]
