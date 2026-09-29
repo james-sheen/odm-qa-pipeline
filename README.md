@@ -2,7 +2,11 @@
 
 Four QA gates, in order, and one verdict from them.
 
-**Released — 0.2.4**, tagged `v0.2.4`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+**Released — 0.2.5**, tagged `v0.2.5`, Apache-2.0, on PyPI as `odm-qa-pipeline`.
+
+**0.2.5 refuses a result it cannot write.** `record` and `aggregate --out` raised a
+traceback on a path they could not write, and a traceback exits 1 -- this tool's code
+for regressions. Both now say what they could not write, and exit 2.
 
 **0.2.4 moves the core's pin to `>=0.1.13,<0.3`.** The referee's 0.3.7 and the
 certificate gate's 0.2.5 both require 0.1.13, the release that names a finding's
